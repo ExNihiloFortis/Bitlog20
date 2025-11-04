@@ -1,0 +1,22 @@
+{
+  "// [BLOQUE 1] Scripts Next": "",
+  "name": "bitlog2",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000"
+  },
+  "// [BLOQUE 2] Deps": "",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.78.0",
+    "next": "^14.2.33",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.9.2",
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}

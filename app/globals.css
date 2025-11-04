@@ -1,0 +1,32 @@
+/* === Bitlog Dark Table === */
+:root { color-scheme: dark; }
+html, body { height: 100%; }
+body { margin: 0; background:#000; color:#d1d5db; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial; }
+
+.container { max-width: 1200px; margin: 0 auto; padding: 32px 16px; }
+.card { background: #0a0a0a; border: 1px solid #1f2937; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+
+h1.title { text-align:center; font-size: 28px; font-weight: 800; margin: 0 0 8px; }
+.sub { text-align:center; color:#9ca3af; font-size:12px; margin-bottom:16px; }
+
+.filters { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+@media (max-width: 900px){ .filters { grid-template-columns: 1fr 1fr; } }
+label.small { display:block; font-size:11px; color:#9ca3af; margin-bottom:6px; }
+.select, .btn { width:100%; border:1px solid #374151; background:#0b0b0b; color:#e5e7eb; border-radius:8px; padding:8px 10px; }
+.btn.primary { background:#fff; color:#000; font-weight:700; border-color:#fff; }
+
+.table-wrap { overflow:auto; border-radius: 12px; border:1px solid #1f2937; }
+.tbl { border-collapse: collapse; min-width:1100px; width:100%; font-size: 13px; }
+.tbl thead th { position: sticky; top: 0; background: #0f172a; color:#cbd5e1; text-align:left; padding:10px 12px; border-bottom:1px solid #1f2937; white-space: nowrap; cursor: pointer; user-select: none; }
+.tbl tbody tr:nth-child(odd){ background:#0b0b0b; }
+.tbl tbody tr:nth-child(even){ background:#111827; }
+.tbl td { padding:10px 12px; border-bottom:1px solid #1f2937; }
+.num { text-align:right; font-variant-numeric: tabular-nums; }
+.pnl-pos { color:#34d399; font-weight:600; } /* verde */
+.pnl-neg { color:#f87171; font-weight:600; } /* rojo */
+.actions .btn-del{ background:#dc2626; color:#fff; border:none; padding:6px 10px; border-radius:8px; }
+
+.pager { display:flex; gap:12px; justify-content:center; align-items:center; margin-top:14px; }
+.pager .btn { border-color:#374151; background:#0f172a; color:#e5e7eb; }
+.err { background:#7f1d1d; color:#fecaca; border:1px solid #b91c1c; padding:8px 10px; border-radius:8px; margin-bottom:10px; }
+
