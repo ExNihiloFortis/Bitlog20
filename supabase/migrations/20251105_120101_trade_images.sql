@@ -1,0 +1,2 @@
+-- placeholder para alinear con remoto (version 20251105 ya aplicada en la DB)
+-- no-op

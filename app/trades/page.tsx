@@ -1,6 +1,15 @@
+// ===================== [2] /trades/page.tsx =====================
+// [2.1] Cambios mínimos sin tocar tu diseño de tabla:
+//  - Importa TopNav y lo muestra arriba.
+//  - Ticket es link a /trades/[id].
+//  - Soporta ?ticket=XXXX para filtrar por ticket exacto.
+//  - (Opcional) botón "Editar" en acciones → /trades/[id]/edit
+// =================================================================
+
 "use client";
 import * as React from "react";
 import { createClient } from "@supabase/supabase-js";
+import TopNav from "@/components/TopNav";
 
 type Trade = {
   id: number;
@@ -52,6 +61,13 @@ export default function TradesPage() {
   const [anchor, setAnchor] = React.useState<{ dt: string | null; id: number | null } | null>(null);
   const [noMore, setNoMore] = React.useState(false);
 
+  // soporte de búsqueda por query ?ticket=XXXX
+  const initialTicketRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const u = new URL(window.location.href);
+    initialTicketRef.current = u.searchParams.get("ticket");
+  }, []);
+
   React.useEffect(() => {
     (async () => {
       try {
@@ -91,6 +107,11 @@ export default function TradesPage() {
       if (fEA)     q = q.eq("ea", fEA);
       if (fSession)q = q.eq("session", fSession);
 
+      // query por ticket (si viene ?ticket=XXXX)
+      if (initialTicketRef.current) {
+        q = q.eq("ticket", initialTicketRef.current);
+      }
+
       if (!reset && anchor?.dt && anchor?.id) q = q.lt("dt_open_utc", anchor.dt).limit(PAGE);
       else q = q.limit(PAGE);
 
@@ -107,7 +128,7 @@ export default function TradesPage() {
     finally{ setLoading(false); }
   }
 
-  function applyFilters(){ setAnchor(null); setNoMore(false); loadPage(true); }
+  function applyFilters(){ initialTicketRef.current = null; setAnchor(null); setNoMore(false); loadPage(true); }
 
   function toggleSort(k: OrderKey){
     if (orderBy === k) setOrderAsc(x=>!x);
@@ -134,102 +155,104 @@ export default function TradesPage() {
   }
 
   return (
-    <div className="container">
-      <h1 className="title">Trades</h1>
-      {user && <p className="sub">Usuario: {user.email} · uid: {user.id}</p>}
-      {err && <p className="err">{err}</p>}
+    <>
+      <TopNav />
+      <div className="container">
+        <h1 className="title">Trades</h1>
+        {user && <p className="sub">Usuario: {user.email} · uid: {user.id}</p>}
+        {err && <p className="err">{err}</p>}
 
-      <div className="card" style={{padding:16}}>
-        <div className="filters">
-          <div>
-            <label className="small">Símbolo</label>
-            <select className="select" value={fSymbol} onChange={e=>setFSymbol(e.target.value)}>
-              <option value="">(Todos)</option>
-              {symbols.map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
+        <div className="card" style={{padding:16}}>
+          <div className="filters">
+            <div>
+              <label className="small">Símbolo</label>
+              <select className="select" value={fSymbol} onChange={e=>setFSymbol(e.target.value)}>
+                <option value="">(Todos)</option>
+                {symbols.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="small">EA</label>
+              <select className="select" value={fEA} onChange={e=>setFEA(e.target.value)}>
+                <option value="">(Todos)</option>
+                {eas.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="small">Sesión</label>
+              <select className="select" value={fSession} onChange={e=>setFSession(e.target.value)}>
+                <option value="">(Todas)</option>
+                {sessions.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",alignItems:"end"}}>
+              <button className="btn primary" onClick={applyFilters}>Aplicar filtros</button>
+            </div>
           </div>
-          <div>
-            <label className="small">EA</label>
-            <select className="select" value={fEA} onChange={e=>setFEA(e.target.value)}>
-              <option value="">(Todos)</option>
-              {eas.map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="small">Sesión</label>
-            <select className="select" value={fSession} onChange={e=>setFSession(e.target.value)}>
-              <option value="">(Todas)</option>
-              {sessions.map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div style={{display:"flex",alignItems:"end"}}>
-            <button className="btn primary" onClick={applyFilters}>Aplicar filtros</button>
-          </div>
-        </div>
 
-        <div className="table-wrap">
-          <table className="tbl">
-            <thead>
-              <tr>
-                {[
-                  ["ticket","Ticket"],
-                  ["symbol","Símbolo"],
-                  ["side","Lado"],
-                  ["volume","Vol"],
-                  ["entry_price","Entry"],
-                  ["exit_price","Exit"],
-                  ["dt_open_utc","Open (UTC)"],
-                  ["dt_close_utc","Close (UTC)"],
-                  ["pnl_usd_gross","$P&L"],
-                ].map(([k,label])=>(
-                  <th key={k} onClick={()=>toggleSort(k as OrderKey)}>
-                    {label}{orderBy===k ? (orderAsc?" ▲":" ▼"):""}
-                  </th>
-                ))}
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {viewRows.map(r=>(
-                <tr key={r.id}>
-                  <td>{r.ticket}</td>
-                  <td>{r.symbol}</td>
-                  <td>{r.side}</td>
-                  <td className="num">{r.volume==null?"":fmtNum.format(r.volume)}</td>
-                  <td className="num">{r.entry_price==null?"":fmtNum.format(r.entry_price)}</td>
-                  <td className="num">{r.exit_price==null?"":fmtNum.format(r.exit_price)}</td>
-                  <td>{asDT(r.dt_open_utc)}</td>
-                  <td>{asDT(r.dt_close_utc)}</td>
-                  <td className={cls("num",
-                      (r.pnl_usd_gross ?? 0) >= 0 ? "pnl-pos" : "pnl-neg"
-                  )}>
-                    {r.pnl_usd_gross==null ? "" : fmtUSD.format(r.pnl_usd_gross)}
-                  </td>
-                  <td className="actions">
-                    <button className="btn-del" onClick={()=>onDelete(r.id)}>Borrar</button>
-                  </td>
+          <div className="table-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  {[
+                    ["ticket","Ticket"],
+                    ["symbol","Símbolo"],
+                    ["side","Lado"],
+                    ["volume","Vol"],
+                    ["entry_price","Entry"],
+                    ["exit_price","Exit"],
+                    ["dt_open_utc","Open (UTC)"],
+                    ["dt_close_utc","Close (UTC)"],
+                    ["pnl_usd_gross","$P&L"],
+                  ].map(([k,label])=>(
+                    <th key={k} onClick={()=>toggleSort(k as OrderKey)}>
+                      {label}{orderBy===k ? (orderAsc?" ▲":" ▼"):""}
+                    </th>
+                  ))}
+                  <th>Acciones</th>
                 </tr>
-              ))}
-              {!viewRows.length && !loading && (
-                <tr><td colSpan={11} style={{textAlign:"center", padding:"16px", color:"#9ca3af"}}>Sin datos</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {viewRows.map(r=>(
+                  <tr key={r.id}>
+                    <td><a href={`/trades/${r.id}`} className="link">{r.ticket}</a></td>
+                    <td>{r.symbol}</td>
+                    <td>{r.side}</td>
+                    <td className="num">{r.volume==null?"":fmtNum.format(r.volume)}</td>
+                    <td className="num">{r.entry_price==null?"":fmtNum.format(r.entry_price)}</td>
+                    <td className="num">{r.exit_price==null?"":fmtNum.format(r.exit_price)}</td>
+                    <td>{asDT(r.dt_open_utc)}</td>
+                    <td>{asDT(r.dt_close_utc)}</td>
+                    <td className={cls("num",(r.pnl_usd_gross ?? 0) >= 0 ? "pnl-pos" : "pnl-neg")}>
+                      {r.pnl_usd_gross==null ? "" : fmtUSD.format(r.pnl_usd_gross)}
+                    </td>
+                    <td className="actions" style={{display:"flex", gap:8}}>
+                      <a className="btn" href={`/trades/${r.id}/edit`}>Editar</a>
+                      <button className="btn-del" onClick={()=>onDelete(r.id)}>Borrar</button>
+                    </td>
+                  </tr>
+                ))}
+                {!viewRows.length && !loading && (
+                  <tr><td colSpan={11} style={{textAlign:"center", padding:"16px", color:"#9ca3af"}}>Sin datos</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="pager">
-          <button
-            className="btn"
-            disabled={loading || noMore}
-            onClick={()=>loadPage(false)}
-            style={{opacity:(loading||noMore)?0.5:1}}
-          >
-            {noMore ? "No hay más" : "Cargar más"}
-          </button>
-          {loading && <span style={{color:"#9ca3af"}}>Cargando…</span>}
+          <div className="pager">
+            <button
+              className="btn"
+              disabled={loading || noMore}
+              onClick={()=>loadPage(false)}
+              style={{opacity:(loading||noMore)?0.5:1}}
+            >
+              {noMore ? "No hay más" : "Cargar más"}
+            </button>
+            {loading && <span style={{color:"#9ca3af"}}>Cargando…</span>}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
