@@ -1,1 +1,6 @@
 .vercel
+# Build caches
+.next/
+node_modules/
+# Hot updates y temporales
+*.hot-update.json
