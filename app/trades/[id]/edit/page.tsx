@@ -1,242 +1,244 @@
-// ===================== [/trades/[id]/edit/page.tsx] =====================
-// Clon de /trades/new, pero en modo edición (update).
-// Encabezado: "Editar Trade (Ticket #...)".
-// =======================================================================
-
 "use client";
-
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import ImageManager from "@/components/ImageManager";
+import useCatalogOptions from "@/lib/useCatalogOptions"; // obtiene symbol/timeframe/ea/pattern/candle desde /field-edits
 
-type Opt = { id?: number; label: string };
-const SESSIONS = ["Asia", "London", "NY", "After-hours"] as const;
-const DEFAULT_TFS = ["M5", "M15", "H1", "H4", "D1"];
+type Trade = {
+  id: number;
+  user_id: string;
+  ticket: string | null;
 
-async function loadOptions(type: string): Promise<Opt[]> {
-  const { data } = await supabase
-    .from("catalog_items")
-    .select("id,value,sort_index")
-    .eq("type", type)
-    .order("sort_index", { ascending: true })
-    .order("value", { ascending: true });
-  return (data || []).map((d) => ({ id: d.id, label: d.value }));
+  symbol: string | null;
+  timeframe: string | null;
+  ea: string | null;
+  patron: string | null;   // pattern
+  vela: string | null;     // candle
+
+  side: "BUY" | "SELL" | null;
+  session: string | null;
+  tendencia: string | null;
+  emocion: string | null;
+
+  entry_price: number | null;
+  exit_price: number | null;
+  volume: number | null;
+  pnl_usd_gross: number | null;
+
+  pips: number | null;
+  rr_objetivo: string | null;
+
+  ea_signal: "BUY" | "SELL" | null;
+  ea_tp1: string | null;
+  ea_tp2: string | null;
+  ea_tp3: string | null;
+  ea_sl1: string | null;
+  ea_score: number | null;
+
+  opening_time_utc: string | null;
+  closing_time_utc: string | null;
+  close_reason: string | null;
+
+  notes: string | null;
+};
+
+function FieldText({ label, value, onChange, required=false }:{
+  label:string; value:string; onChange:(v:string)=>void; required?:boolean;
+}) {
+  return (
+    <div className="field">
+      <label className="label">{label}</label>
+      <input className="input" value={value} onChange={(e)=>onChange(e.target.value)} required={required}/>
+    </div>
+  );
 }
 
-export default function EditTradePage() {
-  const r = useRouter();
-  const { id } = useParams<{ id: string }>();
-  const tradeId = Number(id);
+function FieldNumber({ label, value, onChange }:{
+  label:string; value:string; onChange:(v:string)=>void;
+}) {
+  return (
+    <div className="field">
+      <label className="label">{label}</label>
+      <input className="input" inputMode="decimal" value={value} onChange={(e)=>onChange(e.target.value)} />
+    </div>
+  );
+}
 
-  const [userId, setUserId] = useState("");
-  const [symbols, setSymbols] = useState<Opt[]>([]);
-  const [timeframes, setTimeframes] = useState<Opt[]>([]);
-  const [eas, setEas] = useState<Opt[]>([]);
-  const [patterns, setPatterns] = useState<Opt[]>([]);
-  const [candles, setCandles] = useState<Opt[]>([]);
-  const [loading, setLoading] = useState(true);
+function FieldSelect({ label, value, onChange, options }:{
+  label:string; value:string; onChange:(v:string)=>void; options:string[];
+}) {
+  return (
+    <div className="field">
+      <label className="label">{label}</label>
+      <select className="input" value={value} onChange={(e)=>onChange(e.target.value)}>
+        <option value="">—</option>
+        {options.map(op => <option key={op} value={op}>{op}</option>)}
+      </select>
+    </div>
+  );
+}
+
+const FIXED_TENDENCIA = ["Alcista","Bajista","Lateral"];
+const FIXED_SESION = ["Sydney","Tokyo","London","New York","After-Hours"];
+const FIXED_SIGNAL = ["BUY","SELL"];
+const FIXED_SIDE = ["BUY","SELL"];
+const FIXED_CLOSE = ["User","SL","TP"];
+// [E1] — OPCIONES FIJAS: Emociones (no editables)
+const FIXED_EMOCIONES = [
+  // Positivas
+  "Alegría","Calma","Confianza","Curiosidad","Excitación","Optimismo","Satisfacción",
+  // Negativas
+  "Aburrimiento","Ansiedad","Arrepentimiento","Duda","Fatiga","Frustración","Ira","Miedo",
+];
+
+
+function numOrEmpty(n:number|null){ return (n===null||n===undefined) ? "" : String(n); }
+function strOrNum(s:string){ const v=Number(s); return Number.isNaN(v)? null : v; }
+export default function TradeEditPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+
+  const [uid, setUid] = useState<string>("");
+  const [f, setF] = useState<Trade | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({
-    ticket: "",
-    session: "London" as (typeof SESSIONS)[number],
-    symbol: "",
-    timeframe: "",
-    ea: "",
-    patron: "",
-    vela: "",
-    tendencia: "",
-    pips: "",
-    rr_objetivo: "",
-    pnl_usd_gross: "",
-    notas: "",
-  });
-
-  const onChange = (k: keyof typeof form, v: string) => setForm((s) => ({ ...s, [k]: v }));
-  const disabled = useMemo(() => loading || saving, [loading, saving]);
+  // Catálogos (desde /field-edits)
+  const { symbols, timeframes, eas, patterns, candles, loading: loadingCats, error: catsError } = useCatalogOptions();
 
   useEffect(() => {
     (async () => {
-      setLoading(true);
       const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id ?? "";
-      setUserId(uid);
-      if (!uid) { r.push("/login"); return; }
-
-      const [sy, tf, eaList, pa, ve] = await Promise.all([
-        loadOptions("symbol"),
-        loadOptions("timeframe"),
-        loadOptions("ea"),
-        loadOptions("pattern"),
-        loadOptions("candle"),
-      ]);
-      setSymbols(sy);
-      setTimeframes(tf.length ? tf : DEFAULT_TFS.map((x) => ({ label: x })));
-      setEas(eaList);
-      setPatterns(pa);
-      setCandles(ve);
-
-      // Carga trade
-      const { data, error } = await supabase
-        .from("trades")
-        .select("ticket,session,symbol,timeframe,ea,patron,vela,tendencia,pips,rr_objective,pnl_usd_gross,notes")
-        .eq("id", tradeId)
-        .single();
-      if (error) throw error;
-
-      setForm({
-        ticket: data.ticket ?? "",
-        session: data.session ?? "London",
-        symbol: data.symbol ?? "",
-        timeframe: data.timeframe ?? (tf[0]?.label ?? DEFAULT_TFS[0]),
-        ea: data.ea ?? "",
-        patron: data.patron ?? "",
-        vela: data.vela ?? "",
-        tendencia: data.tendencia ?? "",
-        pips: data.pips ?? "",
-        rr_objetivo: data.rr_objective ?? "",
-        pnl_usd_gross: data.pnl_usd_gross ?? "",
-        notas: data.notes ?? "",
-      });
-
-      setLoading(false);
+      if (!auth.user) { router.push("/login"); return; }
+      setUid(auth.user.id);
+      const { data, error } = await supabase.from("trades").select("*").eq("id", Number(params.id)).maybeSingle();
+      if (error) { alert("Error cargando trade: " + error.message); return; }
+      setF(data as Trade);
     })();
-  }, [tradeId]);
+  }, [params.id, router]);
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const bitlogId = useMemo(()=> f?.id ?? Number(params.id), [f, params.id]);
+
+  function set<K extends keyof Trade>(k: K, v: Trade[K]) {
+    setF(prev => prev ? { ...prev, [k]: v } : prev);
+  }
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!userId) return alert("Inicia sesión primero.");
-    if (!form.ticket.trim()) return alert("El campo Ticket es obligatorio.");
+    if (!f) return;
+    if (!f.ticket || f.ticket.trim() === "") { alert("Ticket es requerido"); return; }
     setSaving(true);
     try {
-      const payload: any = {
-        ticket: form.ticket || null,
-        session: form.session || null,
-        symbol: form.symbol || null,
-        timeframe: form.timeframe || null,
-        ea: form.ea || null,
-        patron: form.patron || null,
-        vela: form.vela || null,
-        tendencia: form.tendencia || null,
-        pips: form.pips ? Number(form.pips) : null,
-        rr_objective: form.rr_objetivo || null,
-        pnl_usd_gross: form.pnl_usd_gross ? Number(form.pnl_usd_gross) : null,
-        notes: form.notas || null,
-      };
-      const { error } = await supabase.from("trades").update(payload).eq("id", tradeId);
+      const payload = { ...f };
+      const { error } = await supabase.from("trades").update(payload).eq("id", f.id);
       if (error) throw error;
-      r.push(`/trades/${tradeId}`);
-    } catch (err: any) {
-      alert("Error al guardar: " + (err?.message ?? String(err)));
+      router.push(`/trades/${f.id}`);
+    } catch (err:any) {
+      alert("Error al guardar: " + (err?.message ?? err));
     } finally {
       setSaving(false);
     }
-  };
+  }
+
+  if (!f) {
+    return (
+      <div className="container">
+        <div id="topnav-placeholder"></div>
+        <div className="card"><p>Cargando…</p></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="page-center">
-      <div className="form-card">
-        <div className="form-head">
-          <div className="form-title">Editar Trade (Ticket #{form.ticket || "—"})</div>
-          <span className="badge">/trades/{tradeId}/edit</span>
+    <div className="container">
+      <div id="topnav-placeholder"></div>
+
+      <div className="card">
+        <div className="head-row" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+          <div>
+            <h1 className="title">Editar Trade #{f.ticket ?? f.id} / <span style={{opacity:.8}}>Bitlog ID: #{bitlogId}</span></h1>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <a className="btn secondary" href={`/trades/${f.id}`}>Cancelar</a>
+            <button className="btn" onClick={onSubmit} disabled={saving || loadingCats}>{saving ? "Guardando..." : "Guardar"}</button>
+          </div>
         </div>
 
-        <form className="form-body" onSubmit={onSubmit}>
-          {/* (mismas 4 filas que /trades/new) */}
-          <div className="grid-3">
-            <div className="field">
-              <label className="label">Ticket *</label>
-              <input className="input" value={form.ticket} onChange={(e)=>onChange("ticket", e.target.value)} disabled={disabled}/>
-            </div>
-            <div className="field">
-              <label className="label">Símbolo</label>
-              <select className="select" value={form.symbol} onChange={(e)=>onChange("symbol", e.target.value)} disabled={disabled}>
-                <option value="">— Selecciona —</option>
-                {symbols.map((o)=> <option key={o.id ?? o.label} value={o.label}>{o.label}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="label">Timeframe</label>
-              <select className="select" value={form.timeframe} onChange={(e)=>onChange("timeframe", e.target.value)} disabled={disabled}>
-                {timeframes.map((o)=> <option key={o.id ?? o.label} value={o.label}>{o.label}</option>)}
-              </select>
-            </div>
+        {catsError ? <div className="alert error">Error cargando catálogos: {String(catsError)}</div> : null}
+
+        <form onSubmit={onSubmit}>
+          {/* Bloque 1: Superiores */}
+          <div className="grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            <FieldText    label="Ticket"    value={f.ticket ?? ""} onChange={(v)=>set("ticket", v)} required />
+
+            <FieldSelect  label="Lado"      value={f.side ?? ""} onChange={(v)=>set("side", (v||null) as any)} options={FIXED_SIDE} />
+
+            <FieldSelect  label="Símbolo"   value={f.symbol ?? ""} onChange={(v)=>set("symbol", v||null)} options={symbols} />
+            <FieldSelect  label="Timeframe" value={f.timeframe ?? ""} onChange={(v)=>set("timeframe", v||null)} options={timeframes} />
+
+            <FieldSelect  label="Sesión"    value={f.session ?? ""} onChange={(v)=>set("session", (v||null) as any)} options={FIXED_SESION} />
+            <FieldSelect  label="Tendencia" value={f.tendencia ?? ""} onChange={(v)=>set("tendencia", (v||null) as any)} options={FIXED_TENDENCIA} />
+            {/* [E2] — Emoción (dropdown fijo) */}
+            <FieldSelect
+                label="Emoción"
+                value={f.emocion ?? ""}
+                onChange={(v)=>set("emocion", (v || null) as any)}
+                options={FIXED_EMOCIONES}
+            />
+            <FieldSelect  label="Close Reason" value={f.close_reason ?? ""} onChange={(v)=>set("close_reason", (v||null) as any)} options={FIXED_CLOSE} />
+
           </div>
 
-          <div className="grid-3">
-            <div className="field">
-              <label className="label">Sesión</label>
-              <select className="select" value={form.session} onChange={(e)=>onChange("session", e.target.value)} disabled={disabled}>
-                {SESSIONS.map((s)=> <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="label">EA</label>
-              <select className="select" value={form.ea} onChange={(e)=>onChange("ea", e.target.value)} disabled={disabled}>
-                <option value="">— Selecciona —</option>
-                {eas.map((o)=> <option key={o.id ?? o.label} value={o.label}>{o.label}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="label">Patrón</label>
-              <select className="select" value={form.patron} onChange={(e)=>onChange("patron", e.target.value)} disabled={disabled}>
-                <option value="">— Selecciona —</option>
-                {patterns.map((o)=> <option key={o.id ?? o.label} value={o.label}>{o.label}</option>)}
-              </select>
-            </div>
+          {/* Bloque 2: Precios/P&L */}
+          <div className="grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginTop:12 }}>
+            <FieldNumber label="Precio de Apertura" value={numOrEmpty(f.entry_price)} onChange={(v)=>set("entry_price", strOrNum(v))} />
+            <FieldNumber label="Precio de Cierre"   value={numOrEmpty(f.exit_price)} onChange={(v)=>set("exit_price", strOrNum(v))} />
+            <FieldNumber label="Volumen"            value={numOrEmpty(f.volume)} onChange={(v)=>set("volume", strOrNum(v))} />
+            <FieldNumber label="$P&L"               value={numOrEmpty(f.pnl_usd_gross)} onChange={(v)=>set("pnl_usd_gross", strOrNum(v))} />
           </div>
 
-          <div className="grid-3">
-            <div className="field">
-              <label className="label">Vela</label>
-              <select className="select" value={form.vela} onChange={(e)=>onChange("vela", e.target.value)} disabled={disabled}>
-                <option value="">— Selecciona —</option>
-                {candles.map((o)=> <option key={o.id ?? o.label} value={o.label}>{o.label}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="label">Tendencia</label>
-              <select className="select" value={form.tendencia} onChange={(e)=>onChange("tendencia", e.target.value)} disabled={disabled}>
-                <option value="">— Selecciona —</option>
-                <option value="Alcista">Alcista</option>
-                <option value="Bajista">Bajista</option>
-                <option value="Lateral">Lateral</option>
-              </select>
-            </div>
-            <div className="field">
-              <label className="label">$ P&L (USD)</label>
-              <input className="input" inputMode="decimal" value={form.pnl_usd_gross} onChange={(e)=>onChange("pnl_usd_gross", e.target.value)} disabled={disabled}/>
-            </div>
+          {/* Bloque 3: Patrón / Vela / R */}
+          <div className="grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginTop:12 }}>
+            <FieldSelect  label="Patrón"   value={f.patron ?? ""} onChange={(v)=>set("patron", v||null)} options={patterns} />
+            <FieldSelect  label="Vela"     value={f.vela ?? ""} onChange={(v)=>set("vela", v||null)} options={candles} />
+            <FieldNumber  label="Pips"     value={numOrEmpty(f.pips)} onChange={(v)=>set("pips", strOrNum(v))} />
+            <FieldText    label="R objetivo" value={f.rr_objetivo ?? ""} onChange={(v)=>set("rr_objetivo", v)} />
           </div>
 
-          <div className="grid-3">
-            <div className="field">
-              <label className="label">Pips</label>
-              <input className="input" inputMode="decimal" value={form.pips} onChange={(e)=>onChange("pips", e.target.value)} disabled={disabled}/>
-            </div>
-            <div className="field">
-              <label className="label">R objetivo</label>
-              <input className="input" placeholder="Ej: 1:2 o 2.0" value={form.rr_objetivo} onChange={(e)=>onChange("rr_objetivo", e.target.value)} disabled={disabled}/>
-            </div>
-            <div className="field">
-              <label className="label">Notas</label>
-              <textarea className="textarea" value={form.notas} onChange={(e)=>onChange("notas", e.target.value)} disabled={disabled}/>
-            </div>
+          {/* Bloque 4: EA */}
+          <div className="grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginTop:12 }}>
+            <FieldSelect  label="EA"         value={f.ea ?? ""} onChange={(v)=>set("ea", v||null)} options={eas} />
+            <FieldSelect  label="Señal (EA)" value={f.ea_signal ?? ""} onChange={(v)=>set("ea_signal", (v||null) as any)} options={FIXED_SIGNAL} />
+            <FieldNumber  label="Calificación (EA)" value={numOrEmpty(f.ea_score)} onChange={(v)=>set("ea_score", strOrNum(v))} />
+            <FieldText    label="TP1" value={f.ea_tp1 ?? ""} onChange={(v)=>set("ea_tp1", v)} />
+            <FieldText    label="TP2" value={f.ea_tp2 ?? ""} onChange={(v)=>set("ea_tp2", v)} />
+            <FieldText    label="TP3" value={f.ea_tp3 ?? ""} onChange={(v)=>set("ea_tp3", v)} />
+            <FieldText    label="SL1" value={f.ea_sl1 ?? ""} onChange={(v)=>set("ea_sl1", v)} />
           </div>
 
-          <div className="btn-row">
-            <a href={`/trades/${tradeId}`} className="btn secondary">Cancelar</a>
-            <button type="submit" className="btn" disabled={disabled}>{saving ? "Guardando..." : "Guardar cambios"}</button>
+         
+          {/* Notas */}
+          <div className="field" style={{ marginTop:12 }}>
+            <label className="label">Notas</label>
+            <textarea className="input" style={{ minHeight:90 }} value={f.notes ?? ""} onChange={(e)=>set("notes", e.target.value)} />
+          </div>
+
+          {/* ImageManager editable */}
+          <div className="field" style={{ marginTop:16 }}>
+            <label className="label">Imágenes</label>
+            <ImageManager tradeId={f.id} userId={uid} />
+          </div>
+
+          <div className="btn-row" style={{ marginTop:12 }}>
+            <a className="btn secondary" href={`/trades/${f.id}`}>Cancelar</a>
+            <button className="btn" type="submit" disabled={saving || loadingCats}>{saving ? "Guardando..." : "Guardar"}</button>
           </div>
         </form>
-
-        <div style={{ marginTop: 18, marginBottom: 12 }}>
-          <div className="label" style={{ marginBottom: 6 }}>Galería (subir / pegar / URL)</div>
-          <ImageManager tradeId={tradeId} userId={userId} />
-        </div>
       </div>
     </div>
   );
 }
+
+
+
 

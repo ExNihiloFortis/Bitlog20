@@ -1,11 +1,17 @@
-// [BLOQUE 0] Versión ----------------------------------------------------------
-const FN_VERSION = "import_csv v3.0-diag";
+// ===============================
+// [BLOQUE 0] Versión
+// ===============================
+const FN_VERSION = "import_csv v3.1-close-reason-raw";
 
-// [BLOQUE 1] Imports ----------------------------------------------------------
+// ===============================
+// [BLOQUE 1] Imports
+// ===============================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parse as parseCsv } from "https://deno.land/std@0.224.0/csv/parse.ts";
 
-// [BLOQUE C1] CORS headers + helper JSON -------------------------------------
+// ===============================
+// [BLOQUE C1] CORS + helper JSON
+// ===============================
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -19,12 +25,16 @@ function json(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), { ...init, headers });
 }
 
-// [BLOQUE 2] Supabase server client ------------------------------------------
+// ===============================
+// [BLOQUE 2] Supabase server client
+// ===============================
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// [BLOQUE 3] Utils CSV (limpieza + separación + parse con fallback) ----------
+// ===============================
+// [BLOQUE 3] Utils CSV (parse robusto)
+// ===============================
 const sanitize = (t: string) =>
   t.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 
@@ -42,7 +52,7 @@ function parseCSV(text: string): { rows: Record<string, string>[]; headers: stri
   const firstLine = lines[0];
   const sep = detectSeparator(firstLine);
 
-  // intento 1: std/csv
+  // Intento 1: std/csv con columns:true
   try {
     const parsed = parseCsv(clean, { columns: true, skipFirstRow: false, separator: sep }) as any[];
     const norm = parsed.map((r) => {
@@ -59,27 +69,22 @@ function parseCSV(text: string): { rows: Record<string, string>[]; headers: stri
     // cae al fallback
   }
 
-  // intento 2 (fallback): split manual respetando comillas
+  // Intento 2: fallback manual (respeta comillas)
   const headers = firstLine.split(sep).map((h) => h.trim().toLowerCase().replace(/\s+/g, "_"));
   const out: Record<string, string>[] = [];
 
   for (let i = 1; i < lines.length; i++) {
     const row = lines[i];
     const cells: string[] = [];
-    let cur = "",
-      inQ = false;
+    let cur = "", inQ = false, quoteChar = "";
 
     for (let j = 0; j < row.length; j++) {
       const ch = row[j];
-      if (ch === '"' || ch === "'") {
-        inQ = !inQ;
-        continue;
+      if ((ch === '"' || ch === "'")) {
+        if (!inQ) { inQ = true; quoteChar = ch; continue; }
+        if (inQ && ch === quoteChar) { inQ = false; quoteChar = ""; continue; }
       }
-      if (ch === sep && !inQ) {
-        cells.push(cur.trim());
-        cur = "";
-        continue;
-      }
+      if (ch === sep && !inQ) { cells.push(cur.trim()); cur = ""; continue; }
       cur += ch;
     }
     cells.push(cur.trim());
@@ -97,42 +102,74 @@ function parseCSV(text: string): { rows: Record<string, string>[]; headers: stri
   return { rows: out, headers };
 }
 
-// [BLOQUE 4] Helpers mapeo ----------------------------------------------------
+// ===============================
+// [BLOQUE 4] Helpers mapeo
+// ===============================
 const TICKET_KEYS = ["ticket", "ticket_id", "order", "order_id", "id", "trade", "trade_id"];
-const OPEN_KEYS = ["opening_time_utc", "dt_open_utc", "open_time_utc", "open_time"];
-const CLOSE_KEYS = ["closing_time_utc", "dt_close_utc", "close_time_utc", "close_time"];
-const ENTRY_KEYS = ["entry_price", "price_open", "open", "entry", "opening_price"]; // <- CSV
-const EXIT_KEYS = ["exit_price", "price_close", "close", "exit", "closing_price"]; // <- CSV
+const OPEN_KEYS   = ["opening_time_utc", "dt_open_utc", "open_time_utc", "open_time"];
+const CLOSE_KEYS  = ["closing_time_utc", "dt_close_utc", "close_time_utc", "close_time"];
+const ENTRY_KEYS  = ["entry_price", "price_open", "open", "entry", "opening_price"];
+const EXIT_KEYS   = ["exit_price", "price_close", "close", "exit", "closing_price"];
 
 const pick = (row: Record<string, string>, keys: string[]) => {
   for (const k of keys) if (row[k] && row[k] !== "") return row[k];
   return "";
 };
-const asNum = (v?: string) => (v && v !== "" ? Number(v) : null);
+const asNum = (v?: string) => (v && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
+const toDate = (v?: string) => {
+  if (!v) return null;
+  const raw = v.trim();
+  // soporta "YYYY-MM-DD HH:MM[:SS]"
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(raw)) {
+    const isoGuess = raw.replace(" ", "T") + "Z";
+    const d = new Date(isoGuess);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+};
 
-// [BLOQUE 4.1] Normalizador close_reason -> set permitido ---------------------
+// ===============================
+// [BLOQUE 4.1] Normalizador close_reason
+// ===============================
+// No forzamos "OTHER". Si no matchea, devolvemos null y luego caemos al valor crudo.
 function normCloseReason(v?: string | null): string | null {
   const s = (v ?? "").trim().toLowerCase();
   if (!s) return null;
+
+  // TP / SL
   if (["tp", "take_profit", "take profit", "take-profit", "profit", "target"].includes(s)) return "TP";
   if (["sl", "stop_loss", "stop loss", "stop-loss", "stopout", "stop out", "stopped"].includes(s)) return "SL";
+
+  // Manual / Breakeven / Time
   if (["manual", "closed manual", "manual_close", "close manual", "close"].includes(s)) return "MANUAL";
   if (["be", "breakeven", "break-even", "break even"].includes(s)) return "BREAKEVEN";
   if (["time", "timeout", "timed", "session end", "end session"].includes(s)) return "TIME";
-  return "OTHER";
+
+  // Si no reconocemos, devolvemos null para caer al valor crudo (raw)
+  return null;
 }
 
-// [BLOQUE 5] Map CSV row -> { raw, app } -------------------------------------
+// ===============================
+// [BLOQUE 5] Map CSV row -> { raw, app }
+// ===============================
 function mapRow(row: Record<string, string>) {
-  const ticket0 = row.ticket || pick(row, TICKET_KEYS);
-  const opening = row.opening_time_utc || pick(row, OPEN_KEYS);
-  const closing = row.closing_time_utc || pick(row, CLOSE_KEYS);
+  const ticket0     = row.ticket || pick(row, TICKET_KEYS);
+  const openingRaw  = row.opening_time_utc || pick(row, OPEN_KEYS);
+  const closingRaw  = row.closing_time_utc || pick(row, CLOSE_KEYS);
   const entry_price = asNum(row.entry_price || pick(row, ENTRY_KEYS) || undefined);
-  const exit_price = asNum(row.exit_price || pick(row, EXIT_KEYS) || undefined);
+  const exit_price  = asNum(row.exit_price  || pick(row, EXIT_KEYS)  || undefined);
+
   const typeRaw = (row.type || row.side || "").toUpperCase();
   const side = typeRaw.includes("BUY") ? "BUY" : typeRaw.includes("SELL") ? "SELL" : null;
-  const lots = asNum(row.lots || row.original_position_size || row.volume || undefined);
+
+  const lots   = asNum(row.lots || row.original_position_size || row.volume || undefined);
   const symbol = row.symbol || row.instrument || row.ticker || "";
+
+  // Close reason: preserva crudo + normalizado (sin forzar OTHER)
+  const close_reason_raw = row.close_reason?.trim() || null;
+  const close_reason_norm = normCloseReason(close_reason_raw);
+  const close_reason = close_reason_norm ?? close_reason_raw ?? null;
 
   return {
     ticket0,
@@ -143,13 +180,14 @@ function mapRow(row: Record<string, string>) {
       symbol: symbol || null,
       type: row.type || side || null,
       lots,
-      opening_time_utc: opening ? new Date(opening) : null,
-      closing_time_utc: closing ? new Date(closing) : null,
+      opening_time_utc: toDate(openingRaw),
+      closing_time_utc: toDate(closingRaw),
       entry_price,
       exit_price,
       commission_usd: Number(row.commission_usd || 0),
       swap_usd: Number(row.swap_usd || 0),
       profit_usd: asNum(row.profit_usd || undefined),
+      close_reason_raw, // <- guardamos crudo también en trades_raw
       raw_json: row,
     },
     app: {
@@ -162,8 +200,8 @@ function mapRow(row: Record<string, string>) {
       ccy: "USD",
       entry_price,
       exit_price,
-      dt_open_utc: opening ? new Date(opening) : null,
-      dt_close_utc: closing ? new Date(closing) : null,
+      dt_open_utc: toDate(openingRaw),
+      dt_close_utc: toDate(closingRaw),
       timeframe: row.timeframe || null,
       session: row.session || null,
       ea: row.ea || null,
@@ -172,23 +210,26 @@ function mapRow(row: Record<string, string>) {
       pnl_usd_gross: asNum(row.profit_usd || undefined),
       pnl_usd_net: null,
       rr: null,
-      status: closing ? "CLOSED" : "OPEN",
-      close_reason: normCloseReason(row.close_reason) as any,
+      status: closingRaw ? "CLOSED" : "OPEN",
+      close_reason_raw,             // <- PRESERVADO
+      close_reason,                 // <- normalizado si aplica; si no, raw; si no, null
       notes: row.notes || null,
       tags: row.tags ? row.tags.split("|") : null,
     },
   };
 }
 
-// [BLOQUE 6] Handler HTTP -----------------------------------------------------
+// ===============================
+// [BLOQUE 6] Handler HTTP
+// ===============================
 Deno.serve(async (req) => {
   try {
-    // [C2] Preflight OPTIONS
+    // Preflight OPTIONS
     if (req.method === "OPTIONS") {
       return new Response("ok", { headers: CORS_HEADERS });
     }
 
-    // [C3] Auth guard con CORS
+    // Auth guard
     const auth = req.headers.get("authorization") ?? "";
     if (!auth.startsWith("Bearer ")) return json({ code: 401, message: "Missing Bearer token" }, { status: 401 });
     const token = auth.slice("Bearer ".length).trim();
@@ -196,12 +237,12 @@ Deno.serve(async (req) => {
     if (!user?.user) return json({ code: 401, message: "Invalid user" }, { status: 401 });
     const user_id = user.user.id;
 
-    // 6.1 form-data
+    // form-data
     const form = await req.formData();
     const file = form.get("file") as File | null;
     if (!file) return json({ ok: false, message: "Missing file" }, { status: 400 });
 
-    // 6.2 parse CSV
+    // parse CSV
     const text = await file.text();
     const { rows, headers } = parseCSV(text);
     if (!rows.length) {
@@ -218,10 +259,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 6.3 inserción/upsert
-    let inserted = 0,
-      merged = 0,
-      skipped_no_symbol = 0;
+    // Inserción / upsert
+    let inserted = 0, merged = 0, skipped_no_symbol = 0;
     const errors: string[] = [];
 
     for (const r of rows) {
@@ -229,10 +268,7 @@ Deno.serve(async (req) => {
 
       // símbolo requerido
       const symbol0 = app.symbol ?? "";
-      if (!symbol0) {
-        skipped_no_symbol++;
-        continue;
-      }
+      if (!symbol0) { skipped_no_symbol++; continue; }
 
       // ticket determinista si falta
       let ticketFinal = ticket0;
@@ -245,12 +281,11 @@ Deno.serve(async (req) => {
       (raw as any).ticket = ticketFinal;
       (app as any).ticket = ticketFinal;
 
-      // trades_raw
-      const { error: e1 } = await supabase.from("trades_raw").upsert({ user_id, ...raw }, { onConflict: "user_id,ticket" });
-      if (e1) {
-        errors.push(`raw:${e1.message}`);
-        continue;
-      }
+      // trades_raw (upsert por user_id + ticket)
+      const { error: e1 } = await supabase
+        .from("trades_raw")
+        .upsert({ user_id, ...raw }, { onConflict: "user_id,ticket" });
+      if (e1) { errors.push(`raw:${e1.message}`); continue; }
 
       // trades (upsert manual)
       const { data: ex, error: eS } = await supabase
@@ -259,30 +294,30 @@ Deno.serve(async (req) => {
         .eq("user_id", user_id)
         .eq("ticket", ticketFinal)
         .maybeSingle();
-      if (eS) {
-        errors.push(`sel:${eS.message}`);
-        continue;
-      }
+      if (eS) { errors.push(`sel:${eS.message}`); continue; }
 
       if (ex?.id) {
-        const { error: e2 } = await supabase.from("trades").update({ ...app }).eq("id", ex.id).eq("user_id", user_id);
-        if (e2) errors.push(`upd:${e2.message}`);
-        else merged++;
+        const { error: e2 } = await supabase
+          .from("trades")
+          .update({ ...app })
+          .eq("id", ex.id)
+          .eq("user_id", user_id);
+        if (e2) errors.push(`upd:${e2.message}`); else merged++;
       } else {
-        const { error: e3 } = await supabase.from("trades").insert([{ user_id, ...app }]);
-        if (e3) errors.push(`ins:${e3.message}`);
-        else inserted++;
+        const { error: e3 } = await supabase
+          .from("trades")
+          .insert([{ user_id, ...app }]);
+        if (e3) errors.push(`ins:${e3.message}`); else inserted++;
       }
     }
 
-    // 6.4 conteo final
+    // conteo final (diagnóstico)
     const { count, error: eCount } = await supabase
       .from("trades")
       .select("*", { head: true, count: "exact" })
       .eq("user_id", user_id);
     if (eCount) errors.push(`cnt:${eCount.message}`);
 
-    // 6.5 respuesta
     return json({
       ok: true,
       version: FN_VERSION,

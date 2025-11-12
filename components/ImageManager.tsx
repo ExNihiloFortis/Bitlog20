@@ -476,12 +476,14 @@ export default function ImageManager({
                   borderBottom: "1px solid rgba(255,255,255,0.12)",
                 }}
               >
+              
+              
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button className="btn" onClick={prev} aria-label="Anterior">←</button>
-                  <div className="modal-title" style={{ opacity: 0.85 }}>
-                    {rows[viewerIdx].title ?? "imagen"}
-                  </div>
+                  
                 </div>
+                
+                
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button className="btn" onClick={next} aria-label="Siguiente">→</button>
                   <button className="btn" onClick={closeViewer} aria-label="Cerrar">Cerrar</button>
@@ -512,7 +514,12 @@ export default function ImageManager({
                 />
               </div>
 
+              {/* NOMBRE DE LA IMG */}
+                   <div className="modal-title" style={{ opacity: 0.85 }}>
+                      {rows[viewerIdx].title ?? "imagen"}
+                  </div>
               {/* FOOTER FIJO (contador) */}
+              
               <div
                 className="modal-foot"
                 style={{
@@ -527,6 +534,7 @@ export default function ImageManager({
                   opacity: 0.85,
                 }}
               >
+                               
                 {`${viewerIdx + 1} / ${rows.length}`}
               </div>
             </div>
