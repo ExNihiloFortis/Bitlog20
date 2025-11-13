@@ -4,3 +4,9 @@
 node_modules/
 # Hot updates y temporales
 *.hot-update.json
+node_modules/
+.next/
+.vercel/
+.env*
+*.log
+*.tar.gz
