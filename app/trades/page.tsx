@@ -5,6 +5,7 @@
 // - Paginación de 50 en 50 con "páginaActual/totalPáginas"
 // - Ordenación en cliente por encabezado
 // - Links a show (/trades/[id]) y a editar (/trades/[id]/edit)
+// - FIX: paginación por OFFSET (range) para no "perder" trades
 // ================================================================
 
 "use client";
@@ -60,9 +61,10 @@ export default function TradesPage() {
     )
   );
 
-  // ---------- Estados de búsqueda/paginación ----------
+  // ---------- Config paginación ----------
   const PAGE = 50;
 
+  // ---------- Estados de búsqueda/paginación ----------
   const [qTicket, setQTicket] = React.useState<string>("");
   const [qId, setQId] = React.useState<string>(""); // Bitlog ID
 
@@ -85,8 +87,6 @@ export default function TradesPage() {
   const [orderBy, setOrderBy] = React.useState<OrderKey>("dt_open_utc");
   const [orderAsc, setOrderAsc] = React.useState<boolean>(false);
 
-  // keyset anchor (último registro cargado)
-  const [anchor, setAnchor] = React.useState<{ dt: string | null; id: number | null } | null>(null);
   const [noMore, setNoMore] = React.useState(false);
 
   // ---------- Soporte querystring (?ticket=..., ?id=...) ----------
@@ -100,7 +100,6 @@ export default function TradesPage() {
       ticket: u.searchParams.get("ticket"),
       id: u.searchParams.get("id"),
     };
-    // si vienen en URL, precargamos en inputs (sin forzar búsqueda aún)
     if (initialRef.current.ticket) setQTicket(initialRef.current.ticket);
     if (initialRef.current.id) setQId(initialRef.current.id);
   }, []);
@@ -131,7 +130,8 @@ export default function TradesPage() {
         setEas(uniq(ea, "ea"));
         setSessions(uniq(sesh, "session"));
 
-        await applyFilters(); // carga página 1 con totales
+        // primera carga con filtros iniciales
+        await applyFilters();
       } catch (e: any) {
         setErr(String(e));
       } finally {
@@ -142,7 +142,7 @@ export default function TradesPage() {
   }, []);
 
   // ---------- Helpers de filtros comunes ----------
-  function applyCommonFilters<T extends any>(q: any) {
+  function applyCommonFilters(q: any) {
     if (fSymbol) q = q.eq("symbol", fSymbol);
     if (fEA) q = q.eq("ea", fEA);
     if (fSession) q = q.eq("session", fSession);
@@ -170,7 +170,7 @@ export default function TradesPage() {
     }
   }
 
-  // ---------- Cargar página (keyset) ----------
+  // ---------- Cargar página usando OFFSET (range) ----------
   async function loadPage(reset = false): Promise<boolean> {
     setLoading(true);
     setErr(null);
@@ -185,11 +185,9 @@ export default function TradesPage() {
 
       q = applyCommonFilters(q);
 
-      if (!reset && anchor?.dt && anchor?.id) {
-        q = q.lt("dt_open_utc", anchor.dt).limit(PAGE);
-      } else {
-        q = q.limit(PAGE);
-      }
+      const from = reset ? 0 : rows.length;
+      const to = from + PAGE - 1;
+      q = q.range(from, to);
 
       const { data, error } = await q;
       if (error) throw new Error(error.message);
@@ -197,14 +195,18 @@ export default function TradesPage() {
       const got = (data ?? []) as Trade[];
       if (reset) {
         setRows(got);
-        setNoMore(got.length < PAGE);
       } else {
         setRows((prev) => [...prev, ...got]);
+      }
+
+      // si ya llegamos o sobrepasamos el total, marcamos noMore
+      const newCount = (reset ? 0 : rows.length) + got.length;
+      if (total > 0) {
+        setNoMore(newCount >= total);
+      } else {
         setNoMore(got.length < PAGE);
       }
 
-      const last = got[got.length - 1];
-      setAnchor(last ? { dt: last.dt_open_utc, id: last.id } : null);
       return got.length > 0;
     } catch (e: any) {
       setErr(String(e));
@@ -217,7 +219,6 @@ export default function TradesPage() {
   // ---------- Aplicar filtros (resetea) ----------
   async function applyFilters(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    setAnchor(null);
     setNoMore(false);
     setPageIdx(1);
     await fetchTotal();
@@ -227,7 +228,9 @@ export default function TradesPage() {
   // ---------- Cargar más ----------
   async function handleLoadMore() {
     const ok = await loadPage(false);
-    if (ok) setPageIdx((p) => Math.min(totalPages, p + 1));
+    if (ok) {
+      setPageIdx((p) => Math.min(totalPages, p + 1));
+    }
   }
 
   // ---------- Ordenación cliente ----------
@@ -238,6 +241,7 @@ export default function TradesPage() {
       setOrderAsc(true);
     }
   }
+
   const viewRows = React.useMemo(() => {
     const xs = [...rows];
     xs.sort((a: any, b: any) => {

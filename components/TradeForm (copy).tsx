@@ -22,9 +22,6 @@ const TENDENCIAS      = ["Alcista","Bajista","Lateral"];
 const EMO_POS         = ["Alegría","Calma","Confianza","Curiosidad","Excitación","Optimismo","Satisfacción"];
 const EMO_NEG         = ["Aburrimiento","Ansiedad","Arrepentimiento","Duda","Fatiga","Frustración","Ira","Miedo"];
 
-// Motivos de cierre (para alinear con imports y charts)
-const CLOSE_REASONS   = ["TP","SL","MANUAL","BE","TRAILING","ERROR","UNKNOWN"];
-
 // ---------------------------------------------------------------------------
 // [BLOQUE 2.3] — SelectEditable (input + datalist + chips Añadir/Quitar)
 // ---------------------------------------------------------------------------
@@ -122,11 +119,6 @@ export default function TradeForm() {
     ea_tp2: "",
     ea_tp3: "",
     ea_sl1: "",
-
-    // Nuevos campos para alinear con imports/charts
-    side: "",           // BUY | SELL
-    volume: "",         // lotes
-    close_reason: "",   // TP | SL | MANUAL | ...
   });
   const onChange = (k: keyof typeof form, v: string) => setForm(s => ({ ...s, [k]: v }));
 
@@ -159,21 +151,16 @@ export default function TradeForm() {
       ticket: form.ticket || null,
 
       // EDITABLES
-      symbol:    form.symbol    || null,
-      timeframe: form.timeframe || null,
-      ea:        form.ea        || null,
-      pattern:   form.patron    || null,
-      candle:    form.vela      || null,
+      symbol:   form.symbol   || null,
+      timeframe:form.timeframe|| null,
+      ea:       form.ea       || null,
+      pattern:  form.patron   || null,
+      candle:   form.vela     || null,
 
       // NO editables (lista cerrada)
-      session:  form.session   || null,
-      trend:    form.tendencia || null,
-      emotion:  form.emocion   || null,
-
-      // Nuevos campos alineados con imports/charts
-      side:         form.side || null,
-      volume:       form.volume ? Number(form.volume) : null,
-      close_reason: form.close_reason || null,
+      session:  form.session  || null,
+      trend:    form.tendencia|| null,
+      emotion:  form.emocion  || null,
 
       // numéricos
       pips:          form.pips ? Number(form.pips) : null,
@@ -348,74 +335,15 @@ export default function TradeForm() {
           <div className="grid-3">
             <div className="field">
               <label className="label">Pips</label>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={form.pips}
-                onChange={(e)=>onChange("pips", e.target.value)}
-              />
+              <input className="input" inputMode="decimal" value={form.pips} onChange={(e)=>onChange("pips", e.target.value)} />
             </div>
             <div className="field">
               <label className="label">R objetivo</label>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={form.r_objetivo}
-                onChange={(e)=>onChange("r_objetivo", e.target.value)}
-              />
+              <input className="input" inputMode="decimal" value={form.r_objetivo} onChange={(e)=>onChange("r_objetivo", e.target.value)} />
             </div>
             <div className="field">
               <label className="label">$ P&amp;L (USD)</label>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={form.pnl_usd_gross}
-                onChange={(e)=>onChange("pnl_usd_gross", e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Grid 5 — nuevos campos (lado, volumen, motivo cierre) */}
-          <div className="grid-3">
-            {/* Lado (Buy/Sell) */}
-            <div className="field">
-              <label className="label">Lado (Buy/Sell)</label>
-              <select
-                className="select"
-                value={form.side}
-                onChange={(e)=>onChange("side", e.target.value)}
-              >
-                <option value="">— Selecciona —</option>
-                <option value="BUY">BUY</option>
-                <option value="SELL">SELL</option>
-              </select>
-            </div>
-
-            {/* Volumen (lotes) */}
-            <div className="field">
-              <label className="label">Volumen (lotes)</label>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={form.volume}
-                onChange={(e)=>onChange("volume", e.target.value)}
-                placeholder="Ej: 0.10"
-              />
-            </div>
-
-            {/* Motivo de cierre */}
-            <div className="field">
-              <label className="label">Motivo de cierre</label>
-              <select
-                className="select"
-                value={form.close_reason}
-                onChange={(e)=>onChange("close_reason", e.target.value)}
-              >
-                <option value="">— Selecciona —</option>
-                {CLOSE_REASONS.map(cr => (
-                  <option key={cr} value={cr}>{cr}</option>
-                ))}
-              </select>
+              <input className="input" inputMode="decimal" value={form.pnl_usd_gross} onChange={(e)=>onChange("pnl_usd_gross", e.target.value)} />
             </div>
           </div>
 

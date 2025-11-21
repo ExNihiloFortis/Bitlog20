@@ -1,13 +1,12 @@
-// ===================== /components/TopNav.tsx =====================
-// Barra superior unificada (BitLog)
-// - Home, Trades, New, Field Edits, Import, Charts, Buscar ticket
-// - Usa .btn-nav (rectangular) y valida ticket por regex.
-// ================================================================
+// ===================== [1] /components/TopNav.tsx =====================
+// [1.1] Barra superior (estilo Charts/BitLog)
+// - Home, Trades, New, Field Edits, Import, Charts, Buscar (por ticket)
+// - Usa botones rectangulares .btn-nav y mantiene la búsqueda por ticket.
+// ======================================================================
 
 "use client";
 
 import React, { useState } from "react";
-import { isValidTicket } from "@/lib/validateTicket";
 
 export default function TopNav() {
   const [ticket, setTicket] = useState("");
@@ -16,12 +15,6 @@ export default function TopNav() {
     e.preventDefault();
     const t = ticket.trim();
     if (!t) return;
-
-    if (!isValidTicket(t)) {
-      alert("Ticket inválido. Usa solo letras, números, guiones y máximo 40 caracteres.");
-      return;
-    }
-
     const url = `/trades?ticket=${encodeURIComponent(t)}`;
     window.location.href = url;
   }
@@ -44,7 +37,7 @@ export default function TopNav() {
           flexWrap: "wrap",
         }}
       >
-        {/* Links principales */}
+        {/* Bloque de links principales */}
         <div
           style={{
             display: "flex",
@@ -61,7 +54,7 @@ export default function TopNav() {
           <a className="btn-nav" href="/charts">Charts</a>
         </div>
 
-        {/* Buscar ticket */}
+        {/* Bloque de búsqueda por ticket */}
         <form
           onSubmit={goSearch}
           style={{

@@ -3,15 +3,27 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+/* =========================
+   TOP NAV (estilo charts)
+   ========================= */
 function TopNav() {
   return (
-    <nav className="topnav" style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-      <a className="btn link" href="/">Home</a>
-      <a className="btn link" href="/trades">Trades</a>
-      <a className="btn link" href="/trades/new">New</a>
-      <a className="btn link" href="/field-edits">Field Edits</a>
-      <a className="btn link" href="/import">Import</a>
-      <a className="btn link" href="/charts">Charts</a>
+    <nav className="topnav" style={{ marginBottom: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <a className="btn-nav" href="/">Home</a>
+        <a className="btn-nav" href="/trades">Trades</a>
+        <a className="btn-nav" href="/trades/new">New</a>
+        <a className="btn-nav" href="/field-edits">Field Edits</a>
+        <a className="btn-nav" href="/import">Import</a>
+        <a className="btn-nav" href="/charts">Charts</a>
+      </div>
     </nav>
   );
 }

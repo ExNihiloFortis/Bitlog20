@@ -84,4 +84,35 @@ body { background:#0b0e11; color:#e8eef6; }
 .modal-foot { display:flex; gap:10px; justify-content:flex-end; padding:12px 14px; border-top:1px solid #1e2630; }
 .badge { display:inline-block; font-size:11px; padding:4px 8px; border-radius:999px; background:#0f141a; border:1px solid #253246; color:#9fb6d0; }
 
+.btn-nav {
+  display: inline-block;
+  padding: 6px 14px;
+  background: #1f6feb;
+  border: 1px solid #333;
+  color: white;
+  border-radius: 0px !important; /* ESQUINAS CUADRADAS */
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.btn-nav:hover {
+  background: #222;
+}
+
+/* Forzar botones rectangulares en toda la app */
+.btn,
+.btn-del,
+.btn-secondary,
+.btn-nav,
+button.btn,
+button.btn-del,
+a.btn,
+a.btn-del {
+  border-radius: 0px !important;
+}
+
+
+
+
 

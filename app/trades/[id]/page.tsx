@@ -8,6 +8,13 @@ import ImageManager from "@/components/ImageManager";
 /* =========================
    HELPERS UI
    ========================= */
+   
+function displayCloseReason(raw: string | null | undefined) {
+  if (!raw) return "—";
+  if (raw === "OTHER") return "USER";   // aquí hacemos el “alias” visual
+  return raw;
+}
+
 function Field({
   label,
   value,
@@ -64,20 +71,30 @@ function formatDuration(ms: number) {
 }
 
 /* =========================
-   TOP NAV
+   TOP NAV (estilo charts)
    ========================= */
 function TopNav() {
   return (
-    <nav className="topnav" style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-      <a className="btn link" href="/">Home</a>
-      <a className="btn link" href="/trades">Trades</a>
-      <a className="btn link" href="/trades/new">New</a>
-      <a className="btn link" href="/field-edits">Field Edits</a>
-      <a className="btn link" href="/import">Import</a>
-      <a className="btn link" href="/charts">Charts</a>
+    <nav className="topnav" style={{ marginBottom: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <a className="btn-nav" href="/">Home</a>
+        <a className="btn-nav" href="/trades">Trades</a>
+        <a className="btn-nav" href="/trades/new">New</a>
+        <a className="btn-nav" href="/field-edits">Field Edits</a>
+        <a className="btn-nav" href="/import">Import</a>
+        <a className="btn-nav" href="/charts">Charts</a>
+      </div>
     </nav>
   );
 }
+
 
 /* =========================
    PÁGINA SHOW
@@ -253,7 +270,7 @@ export default function TradeShowPage() {
             <Field label="Swap" value={fmtNum(t.swap)} />
             <Field label="Equity (USD)" value={fmtNum(t.equity_usd)} />
             <Field label="Margin Level" value={fmtNum(t.margin_level)} />
-            <Field label="Close Reason" value={t.close_reason ?? "—"} />
+            <Field label="Close Reason" value={displayCloseReason(t.close_reason)} />
           </div>
         </div>
 
