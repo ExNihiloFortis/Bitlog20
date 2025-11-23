@@ -242,25 +242,69 @@ export default function ImageManager({
     }
   }
 
-  // ===================== [IM-4] Borrar/renombrar =====================
-  async function remove(id?: number, src?: string) {
-    if (readOnly) return;
+// ===================== [IM-4] Borrar/renombrar =====================
+async function remove(id?: number, src?: string) {
+  if (readOnly) return;
 
-    if (!tradeId) {
-      if (src) {
-        setQueuedUrls((prev) => prev.filter((u) => u !== src));
-        setQueue((prev) => prev.filter((b) => `local://${b.size}_${b.type}` !== src));
-        rebuildLocalRows();
+  // ⬇️ Caso 1: todavía no hay tradeId → solo limpiamos la cola local (igual que antes)
+  if (!tradeId) {
+    if (src) {
+      setQueuedUrls((prev) => prev.filter((u) => u !== src));
+      setQueue((prev) => prev.filter((b) => `local://${b.size}_${b.type}` !== src));
+      rebuildLocalRows();
+    }
+    return;
+  }
+
+  // ⬇️ Caso 2: hay tradeId → borrar en backend (Edge Function + Storage)
+  if (!id) return;
+  if (!confirm("¿Borrar imagen?")) return;
+
+  // Obtener JWT actual
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token;
+
+  if (!token) {
+    alert("No hay sesión válida. Vuelve a iniciar sesión.");
+    return;
+  }
+
+  try {
+    const resp = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete_trade_image`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image_id: id }),
       }
+    );
+
+    if (!resp.ok) {
+      let msg = "Error borrando imagen.";
+      try {
+        const info = await resp.json();
+        if (info?.error) msg = info.error;
+      } catch {
+        // ignoramos parse error, usamos msg genérico
+      }
+      console.error("delete_trade_image error", resp.status, msg);
+      alert(msg);
       return;
     }
 
-    if (!id) return;
-    if (!confirm("¿Borrar imagen?")) return;
-    const { error } = await supabase.from("trade_images").delete().eq("id", id);
-    if (error) return alert("No se pudo borrar: " + error.message);
+    // Recargar imágenes desde BD (misma lógica que ya usas)
     await loadFromDb();
+  } catch (e: any) {
+    console.error("delete_trade_image exception", e);
+    alert("Error inesperado borrando imagen.");
   }
+}
+
+ 
 
   function draftKey(r: ImgRow, i: number) {
     return `${r.id ?? "local"}_${i}`;
