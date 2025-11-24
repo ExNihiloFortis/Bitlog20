@@ -1,0 +1,141 @@
+BitLog 2.0 – Restore Point TOTAL
+Fecha: 2025-11-21
+
+1) REPO (GitHub)
+----------------
+Repo: git@github.com:ExNihiloFortis/Bitlog20.git
+Branch principal: master
+Commit de este restore point:
+  - Ver con: git rev-parse HEAD
+  - Guardar aquí el SHA actual después de crear este archivo.
+
+Tag asociado:
+  - BitLog_RP_2025-11-21_FULL
+
+2) SUPABASE
+-----------
+Proyecto:
+  - URL: https://lmdqwatifsrulwimhyce.supabase.co
+  - Project ref: lmdqwatifsrulwimhyce
+
+Migrations:
+  - Local y Remote sincronizados.
+  - Verificado con: supabase migration list
+
+Tablas clave:
+  - public.trades
+  - public.trade_images
+  - public.catalog_items
+  - public.user_otp
+
+Storage:
+  - Bucket: journal (privado)
+  - Ruta de imágenes: u_<uid>/t_<tradeId>/...
+  - RLS activo según policies del proyecto.
+
+Edge Functions desplegadas:
+  - request_otp
+  - verify_otp
+  - delete_trade
+  - delete_trade_image
+
+IMPORTANTE:
+  - NO se guardan aquí valores de:
+    - SUPABASE_ANON_KEY
+    - SUPABASE_SERVICE_ROLE_KEY
+    - SUPABASE_DB_URL
+  Esos viven solo en:
+    - Supabase Dashboard → Project Settings → API / Config.
+
+3) VERCEL
+---------
+Proyecto:
+  - Nombre: BitLog20
+  - Dominio: https://bitlog20.vercel.app
+
+Framework:
+  - Next.js
+
+Build & Runtime:
+  - Build Command: next build
+  - Output Directory: .next
+  - Install Command: npm install
+  - Node.js Version: 20.x (fijado en Project Settings)
+
+Environment Variables (solo nombres):
+  - NEXT_PUBLIC_SUPABASE_URL
+  - NEXT_PUBLIC_SUPABASE_ANON_KEY
+  - SUPABASE_SERVICE_ROLE_KEY
+  - RESEND_API_KEY
+  - EMAIL_FROM
+
+Repositorio conectado:
+  - GitHub: ExNihiloFortis/Bitlog20
+  - Branch: master
+
+4) FUNCIONALIDAD PROBADA EN ESTE RESTORE POINT
+----------------------------------------------
+- Login con email + password (Supabase).
+- 2FA por email (Resend):
+  - request_otp genera OTP y lo guarda en user_otp.
+  - verify_otp valida OTP, marca como usado y permite paso a /trades.
+- CRUD de trades:
+  - /trades
+  - /trades/[id]
+  - /trades/[id]/edit
+  - /trades/new
+- Importador CSV:
+  - /import → función import_csv → inserted/merged/skipped.
+- Charts:
+  - /charts con:
+    - Filtros globales
+    - Bloques de performance
+    - Confluencias
+    - Heatmap, barras, etc.
+- Imágenes:
+  - Subida desde archivo local
+  - Pegado (Ctrl+V)
+  - URL externa (no consume storage)
+  - Borrado de imágenes:
+    - Desde /trades/[id]/edit → borra fila en trade_images y archivo en bucket.
+  - Borrado de trade:
+    - Desde /trades → delete_trade (Edge Function) borra trade + imágenes + archivos.
+
+5) CÓMO RESTAURAR DESDE ESTE PUNTO (RESUMEN)
+---------------------------------------------
+1. Clonar repo:
+   git clone git@github.com:ExNihiloFortis/Bitlog20.git
+   cd Bitlog20
+   git checkout master
+   git checkout BitLog_RP_2025-11-21_FULL
+
+2. Instalar:
+   npm install
+
+3. Supabase:
+   - Crear proyecto nuevo o usar el actual.
+   - Ejecutar migrations:
+     supabase link --project-ref <nuevo-ref>
+     supabase migration up
+
+4. Configurar .env.local con:
+   NEXT_PUBLIC_SUPABASE_URL
+   NEXT_PUBLIC_SUPABASE_ANON_KEY
+   SUPABASE_SERVICE_ROLE_KEY
+   RESEND_API_KEY
+   EMAIL_FROM
+
+5. Vercel:
+   - Crear/usar proyecto
+   - Conectar repo ExNihiloFortis/Bitlog20
+   - Fixear Node 20.x
+   - Copiar mismas env vars.
+
+6. Levantar:
+   - Local: npm run dev
+   - Producción: deploy desde Vercel.
+
+Nota:
+Este restore point NO incluye datos de trades (la BD puede estar vacía o con datos de prueba).
+La estructura, funciones y flujo OTP están completos y funcionales.
+
