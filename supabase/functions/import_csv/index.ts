@@ -153,6 +153,10 @@ function normCloseReason(v?: string | null): string | null {
 // ===============================
 // [BLOQUE 5] Map CSV row -> { raw, app }
 // ===============================
+
+// ===============================
+// [BLOQUE 5] Map CSV row -> { raw, app }
+// ===============================
 function mapRow(row: Record<string, string>) {
   const ticket0     = row.ticket || pick(row, TICKET_KEYS);
   const openingRaw  = row.opening_time_utc || pick(row, OPEN_KEYS);
@@ -167,53 +171,98 @@ function mapRow(row: Record<string, string>) {
   const symbol = row.symbol || row.instrument || row.ticker || "";
 
   // Close reason: preserva crudo + normalizado (sin forzar OTHER)
-  const close_reason_raw = row.close_reason?.trim() || null;
-  const close_reason_norm = normCloseReason(close_reason_raw);
-  const close_reason = close_reason_norm ?? close_reason_raw ?? null;
+  const close_reason_raw =
+    row.close_reason_raw ||
+    row.close_reason      ||
+    row.comment           ||
+    row.reason            ||
+    null;
+
+  let close_reason = normCloseReason(close_reason_raw);
+
+  // 🔹 Profit estandarizado (usamos siempre el NETO como rey)
+  const profit = asNum(
+    row.profit_usd ??
+    row.pnl_usd_net ??
+    row.pnl_usd_gross ??
+    undefined
+  );
+
+  // Si no viene close_reason pero sí hay profit → inferimos TP/SL/OTHER
+  if (!close_reason && profit !== null) {
+    if (profit > 0) close_reason = "TP";
+    else if (profit < 0) close_reason = "SL";
+    else close_reason = "OTHER";
+  }
 
   return {
-    ticket0,
     raw: {
-      ticket: ticket0 || "",
-      broker: row.broker || null,
-      broker_account: row.broker_account || null,
-      symbol: symbol || null,
-      type: row.type || side || null,
+      ...row,
+      ticket: ticket0,
+      symbol,
+      side,
       lots,
-      opening_time_utc: toDate(openingRaw),
-      closing_time_utc: toDate(closingRaw),
       entry_price,
       exit_price,
-      commission_usd: Number(row.commission_usd || 0),
-      swap_usd: Number(row.swap_usd || 0),
-      profit_usd: asNum(row.profit_usd || undefined),
-      close_reason_raw, // <- guardamos crudo también en trades_raw
-      raw_json: row,
+      opening_time_utc: openingRaw,
+      closing_time_utc: closingRaw,
+      close_reason_raw,
     },
-    app: {
-      ticket: ticket0 || "",
-      broker: row.broker || null,
-      broker_account: row.broker_account || null,
-      symbol: symbol || null,
+    trade: {
+      // Identidad básica
+      user_id: row.user_id || null,
+      ticket: ticket0,
+      symbol,
       side,
       volume: lots,
-      ccy: "USD",
+
+      // Precios y tiempos
       entry_price,
       exit_price,
-      dt_open_utc: toDate(openingRaw),
-      dt_close_utc: toDate(closingRaw),
+      dt_open_utc: openingRaw ? new Date(openingRaw).toISOString() : null,
+      dt_close_utc: closingRaw ? new Date(closingRaw).toISOString() : null,
+
+      // Meta / contexto
       timeframe: row.timeframe || null,
       session: row.session || null,
       ea: row.ea || null,
-      fee_usd: Number(row.commission_usd || 0),
-      swap_usd: Number(row.swap_usd || 0),
-      pnl_usd_gross: asNum(row.profit_usd || undefined),
-      pnl_usd_net: null,
-      rr: null,
+
+      // 🔹 PIPS y R
+      pips: row.pips ? asNum(row.pips) : null,
+      rr_objetivo: row.rr_objetivo || null,
+
+      // 🔹 PNL (usamos profit como neto, y lo copiamos a gross para compatibilidad)
+      pnl_usd_gross: profit,
+      pnl_usd_net: profit,
+
+      // 🔹 Costos
+      fee_usd: asNum(row.fee_usd || row.commission_usd || undefined),
+      swap_usd: asNum(row.swap_usd || undefined),
+      swap: asNum(row.swap || row.swap_usd || undefined),
+      equity_usd: asNum(row.equity_usd || undefined),
+      margin_level: asNum(row.margin_level || undefined),
+
+      // 🔹 EA y confluencias
+      ea_signal: row.ea_signal || null,
+      ea_score: row.ea_score ? Number(row.ea_score) : null,
+      ea_tp1: row.ea_tp1 || null,
+      ea_tp2: row.ea_tp2 || null,
+      ea_tp3: row.ea_tp3 || null,
+      ea_sl1: row.ea_sl1 || null,
+
+      patron: row.patron || null,
+      vela: row.vela || null,
+      tendencia: row.tendencia || null,
+      emocion: row.emocion || null,
+
+      // 🔹 Estado y cierre
+      rr: null, // (si en el futuro lo calculamos, se rellena aquí)
       status: closingRaw ? "CLOSED" : "OPEN",
-      close_reason_raw,             // <- PRESERVADO
-      close_reason,                 // <- normalizado si aplica; si no, raw; si no, null
-      notes: row.notes || null,
+      close_reason_raw,
+      close_reason,
+
+      // 🔹 Notas / tags
+      notes: row.notes || row.notas || null,
       tags: row.tags ? row.tags.split("|") : null,
     },
   };
