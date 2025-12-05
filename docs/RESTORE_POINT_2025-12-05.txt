@@ -1,0 +1,54 @@
+RESTORE POINT – Bitlog 2.0
+Fecha: 2025-12-05
+Nombre: Bitlog2_STABLE_PRE_EA_EMA100_200_2025-12-05
+
+1) Código
+- Repo GitHub: git@github.com:ExNihiloFortis/Bitlog20.git
+- Rama: master
+- Tag estable: Bitlog2_STABLE_PRE_EA_EMA100_200_2025-12-05
+- Commit SHA: [PON AQUI EL SHA DE ESE TAG -> git rev-parse Bitlog2_STABLE_PRE_EA_EMA100_200_2025-12-05]
+
+2) Supabase
+- Project ref: lmdqwatifsrulwimhyce
+- Región: [la que muestre el dashboard]
+- BD: postgres (managed por Supabase)
+- Bucket principal de imágenes: journal
+- Tablas críticas:
+  - trades
+  - trade_images
+  - catalog_items
+  - imports (si existe)
+- Estructura de BD codificada en:
+  - supabase/migrations/*
+  - RLS y policies incluidas en las migraciones
+
+3) Functions importantes
+- supabase/functions/import_csv
+- [añadir aquí otras functions si las creamos en el futuro]
+
+4) Vercel
+- Proyecto: bitlog20
+- Produce build con: npm run build
+- Node: 20.x
+- Variables de entorno importantes:
+  - NEXT_PUBLIC_SUPABASE_URL
+  - NEXT_PUBLIC_SUPABASE_ANON_KEY
+  - SUPABASE_SERVICE_ROLE_KEY (si se usa en edge functions/env)
+
+5) Restore desde cero (resumen)
+- Clonar repo desde GitHub.
+- Checkout al tag Bitlog2_STABLE_PRE_EA_EMA100_200_2025-12-05.
+- Configurar .env.local y supabase/.env tal como estaban.
+- Crear NUEVO proyecto en Supabase (si el anterior no existe).
+- Ejecutar:
+  - supabase link --project-ref [nuevo_ref]
+  - supabase db reset  (o supabase db push) para aplicar todas las migraciones.
+  - supabase functions deploy import_csv [y demás functions que existan].
+- Crear bucket 'journal' en Storage, con las mismas policies.
+- Conectar Vercel al repo/tag y desplegar.
+- Listo: Bitlog arranca sin datos, pero con estructura completa.
+
+6) Snapshot local
+- Archivo TAR con todo el proyecto:
+  ../restore_points/Bitlog2_RP_2025-12-05_FULL.tar.gz
+
