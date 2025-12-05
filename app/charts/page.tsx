@@ -623,37 +623,41 @@ export default function ChartsPage() {
   const handleExportCsv = () => {
     if (!visibleTrades.length) return;
 
-    const headers = [
-      "id",
-      "ticket",
-      "symbol",
-      "timeframe",
-      "session",
-      "dt_open_utc",
-      "dt_close_utc",
-      "side",
-      "volume",
-      "entry_price",
-      "exit_price",
-      "pips",
-      "rr_objetivo",
-      "pnl_usd_gross",
-      "pnl_usd_net",
-      "fee_usd",
-      "swap",
-      "ea",
-      "ea_signal",
-      "ea_score",
-      "ea_tp1",
-      "ea_tp2",
-      "ea_tp3",
-      "ea_sl1",
-      "patron",
-      "vela",
-      "tendencia",
-      "emocion",
-      "notes",
-    ];
+   const headers = [
+  "id",
+  "ticket",
+  "symbol",
+  "timeframe",
+  "session",
+  "dt_open_utc",
+  "dt_close_utc",
+  "side",
+  "volume",
+  "entry_price",
+  "exit_price",
+  "pips",
+  "rr_objetivo",
+  "pnl_usd_gross",
+  "pnl_usd_net",
+  "fee_usd",
+  "swap",
+  "close_reason",
+  "ea",
+  "ea_signal",
+  "ea_score",
+  "ea_tp1",
+  "ea_tp2",
+  "ea_tp3",
+  "ea_sl1",
+  "patron",
+  "vela",
+  "tendencia",
+  "emocion",
+  "notes",
+  ];
+
+
+
 
     const escapeCell = (value: any) => {
       if (value === null || value === undefined) return "";
@@ -683,6 +687,7 @@ export default function ChartsPage() {
         t.pnl_usd_net ?? "",
         t.fee_usd ?? "",
         t.swap ?? "",
+        t.close_reason ?? "", // 👈 AQUÍ LO AGREGAMOS
         t.ea ?? "",
         t.ea_signal ?? "",
         t.ea_score ?? "",

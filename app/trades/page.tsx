@@ -422,13 +422,22 @@ export default function TradesPage() {
                   placeholder="Ej. 476665"
                 />
               </div>
+              
               <div>
                 <button className="btn" type="submit" style={{ height: 34 }}>
                   🔍
                 </button>
+                
               </div>
             </form>
+            
+            {/* Resumen de resultados (cuantos trades resultaron del filtrado) */}
+              <div style={{ margin: "8px 0", color: "#4b5563" }}>
+                 Resultado: {total} trade{total === 1 ? "" : "s"}
+              </div>
           </div>
+
+          
 
           {/* Tabla */}
           <div className="table-wrap">
