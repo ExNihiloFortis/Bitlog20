@@ -114,6 +114,28 @@ async function loadOptions(type: string): Promise<Opt[]> {
   return [];
 }
 
+// ===================== [TF5.9] Tipos de formulario y props =====================
+
+// Forma flexible de los valores del formulario.
+// Si en el futuro agregamos más campos, no habrá problema.
+export type TradeFormValues = {
+  [key: string]: any;
+};
+
+// Modo de uso del formulario: crear o editar
+type TradeFormMode = "create" | "edit";
+
+
+// Props esperadas por el componente TradeForm
+type TradeFormProps = {
+  mode: TradeFormMode;
+  initialValues: TradeFormValues;
+  disabled?: boolean;
+  saving?: boolean;
+  onSubmit: (values: TradeFormValues) => Promise<void> | void;
+};
+
+
 // ===================== [TF6] Componente principal TradeForm =====================
 export default function TradeForm(props: TradeFormProps) {
   const { mode, initialValues, disabled = false, saving = false, onSubmit } = props;

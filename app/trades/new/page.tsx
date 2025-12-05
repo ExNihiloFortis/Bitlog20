@@ -301,12 +301,13 @@ export default function TradeNewPage() {
         </div>
 
         {/* Formulario global */}
-        <TradeForm
+       <TradeForm
           mode="create"
           initialValues={INITIAL_VALUES}
           saving={saving}
-          onSubmit={handleSubmit}
+          onSubmit={(values) => handleSubmit(values as any)}
         />
+
 
         {/* Galería (activa en NEW: cola blobs+urls) */}
         <div className="field" style={{ marginTop: 16 }}>
