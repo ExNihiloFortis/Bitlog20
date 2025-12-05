@@ -1,0 +1,802 @@
+📘 MÓDULO 0 — VISIÓN GENERAL DEL EA WavesEMAS
+
+Este EA NO abre operaciones.
+Su trabajo es decirte:
+
+“Oye, aquí hay un impulso interesante:
+tendencia clara, zona lógica, energía decente, espacio y costo razonables.”
+
+Tu trabajo como trader es:
+
+Ver la alerta en Telegram.
+
+Abrir el gráfico en el timeframe de la señal (ej. M15 / H1 / H4).
+
+Abrir tu checklist / este manual.
+
+Revisar confluencias.
+
+Decidir:
+
+❌ No operar
+
+✅ Operación normal (A / B)
+
+⭐ Operación AAA / AAA+ (las que pagan el depa frente al mar)
+
+WavesEMAS analiza:
+
+EMAs 7, 20, 50 → tendencia y dirección.
+
+Vela actual → si hay intención real o solo ruido.
+
+Zonas → Fibo, SR, BOS.
+
+ATR → energía del mercado.
+
+roomATR → espacio libre hasta la siguiente “pared”.
+
+Spread → costo de entrada.
+
+Score 0–100 → calidad global.
+
+Tú sólo confirmas visualmente que el gráfico respalda lo que el EA está diciendo.
+
+
+--------------------------------------------------
+
+🟦 MÓDULO 1 — TENDENCIA CLARA (EMAs ALINEADAS)
+1️⃣ Tendencia clara (EMAs 7, 20, 50 + precio vs EMA20)
+🔹 QUÉ ES
+
+La dirección dominante del precio en el timeframe de la señal, medida por tres EMAs:
+
+EMA7 → impulso inmediato (corto plazo).
+
+EMA20 → ritmo intermedio del movimiento.
+
+EMA50 → estructura general de tendencia.
+
+El EA define:
+
+BUY (señal de compra) cuando:
+
+EMA7 > EMA20 > EMA50
+
+Precio actual por encima de EMA20
+
+SELL (señal de venta) cuando:
+
+EMA7 < EMA20 < EMA50
+
+Precio actual por debajo de EMA20
+
+Si no se cumple ese orden → no hay tendencia limpia → el EA ni siquiera marca trend_ok.
+
+🎯 PARA QUÉ SIRVE
+
+Filtra contextos donde:
+
+El precio va claramente en una dirección.
+
+No estás tratando de adivinar giros en un rango choppy.
+
+El impulso detectado por el EA tiene respaldo de tendencia.
+
+Sin esta confluencia:
+
+Puedes tener velas grandes bonitas…
+
+Pero en realidad estás en un rango o en pleno giro raro.
+
+📆 CUÁNDO CONFIAR
+
+Confías cuando:
+
+Al abrir el gráfico, sin pensar mucho, tu cerebro dice:
+
+“Esto claramente va para arriba”
+
+o
+
+“Esto claramente va para abajo”
+
+Ves que:
+
+BUY:
+
+EMA50 abajo, EMA20 en medio, EMA7 arriba.
+
+Todas con pendiente coherente.
+
+Precio por encima de EMA20 (no soterrado).
+
+SELL:
+
+EMA50 arriba, EMA20 en medio, EMA7 abajo.
+
+Todas apuntando hacia abajo.
+
+Precio por debajo de EMA20.
+
+Los retrocesos son ordenados, no caóticos.
+
+⚠ CUÁNDO DESCONFIAR
+
+Desconfías cuando:
+
+Las EMAs están casi horizontales.
+
+La EMA7 cruza la 20 una y otra vez como licuadora.
+
+El precio está bailando alrededor de EMA20, arriba/abajo sin sentido.
+
+Ves máximos y mínimos desordenados:
+
+Subidas y bajadas alternadas sin patrón HL/LH claro.
+
+Aunque el EA marque una señal, si visualmente ves “chop”, tu decisión es:
+
+“El algoritmo encontró algo pero el contexto está sucio → lo ignoro.”
+
+👁 CÓMO SE VE EN M15 / H1 / H4
+
+Tendencia alcista sana (ej. H1):
+
+EMA50 inclinada hacia arriba como una loma.
+
+EMA20 por encima de la 50, más pegada al precio.
+
+EMA7 por encima de la 20, siguiendo las velas más de cerca.
+
+El precio hace movimientos tipo escalera:
+
+Sube → corrige un poco → sube más.
+
+Tendencia bajista sana (ej. M15 o H1):
+
+EMA50 inclinada hacia abajo.
+
+EMA20 debajo de la 50.
+
+EMA7 debajo de la 20.
+
+El precio hace LH → LH → LH y LL → LL, con retrocesos hacia las EMAs.
+
+❌ ERRORES TÍPICOS
+
+Ver “tendencia” donde sólo hay un movimiento fuerte aislado.
+
+Operar porque “ya toca un trade hoy”, aunque las EMAs estén planas.
+
+Confundir un mini-tramo alcista en M15 con una tendencia real de H1/H4.
+
+Ignorar que el precio está pegado a EMA50 cruzándola cada rato.
+
+
+--------------------------------------------------
+
+🟦 MÓDULO 2 — VELA DE CONFIRMACIÓN (confirm_ok)
+
+El EA no solo ve tendencia. También exige que la vela actual tenga intención real, no que sea un suspiro.
+
+2️⃣ Confirmación de vela mínima (confirm_ok)
+
+El EA exige dos cosas a la vez:
+
+Cuerpo suficientemente grande (body vs ATR).
+
+Sin mecha fuerte contra la dirección tocando EMA7.
+
+🔹 QUÉ ES (parte 1) — Cuerpo grande vs ATR
+
+El EA mide:
+
+Tamaño del cuerpo de la vela actual (open → close).
+
+Lo compara con el ATR (volatilidad media).
+
+Condición general:
+
+El cuerpo debe ser ≥ 1.20 × ATR normalizado
+
+Traducción:
+
+Vela “enana” ⇒ NO hay confirmación.
+
+Vela con cuerpo sólido ⇒ sí hay intención y momentum.
+
+🎯 PARA QUÉ SIRVE
+
+Evita entradas en movimientos débiles:
+
+Dojis,
+
+micro velas,
+
+velas de indecisión.
+
+Te obliga a entrar solo cuando se ve que:
+
+“Alguien empujó el precio con fuerza en esta vela.”
+
+📆 CUÁNDO CONFIAR (cuerpo)
+
+Confías cuando:
+
+A simple vista en el gráfico, esa vela destaca sobre las anteriores.
+
+El cuerpo ocupa una parte importante del rango de la vela (no es pura mecha).
+
+Comparada con las últimas 10–20 velas, no es de las más pequeñas.
+
+BUY:
+
+Vela alcista clara, cuerpo grande, cerrando cerca del máximo.
+
+SELL:
+
+Vela bajista clara, cuerpo grande, cerrando cerca del mínimo.
+
+⚠ CUÁNDO DESCONFIAR
+
+Vela con cuerpo chico y mechas grandes.
+
+Vela tan pequeña que puedes ignorarla sin culpa.
+
+Vela que parece relleno entre velas más grandes.
+
+Si la “vela de señal” se ve diminuta, aunque el EA diga que confirm_ok es true, tú visualmente puedes subir el estándar y decir:
+
+“No me gusta, esto no es intención, es ruido.”
+
+🔹 QUÉ ES (parte 2) — Mecha contra tendencia vs EMA7
+
+Además del cuerpo, el EA revisa:
+
+BUY:
+
+low[0] (mínimo de la vela) no debe caer hasta EMA7 y cerrar por debajo.
+
+SELL:
+
+high[0] (máximo) no debe subir hasta EMA7 y cerrar por arriba.
+
+Idea central:
+
+“No quiero una vela que venga con rechazo fuerte en contra de mi dirección.”
+
+🎯 PARA QUÉ SIRVE
+
+Evitar señales donde:
+
+La vela hace un gran rechazo en contra justo en el momento de entrar.
+
+Eso muchas veces precede a giros o movimientos falsos.
+
+📆 CUÁNDO CONFIAR (mechas)
+
+Confías cuando:
+
+En BUY:
+
+La mecha de abajo es corta o moderada.
+
+No perfora ni se clava agresivamente en EMA7.
+
+En SELL:
+
+La mecha de arriba es corta o moderada.
+
+No revienta EMA7 por arriba para luego cerrar abajo.
+
+Visualmente:
+
+Vela limpia, sin sombra gigante en contra de la dirección.
+
+⚠ CUÁNDO DESCONFIAR
+
+Mecha larguísima contra tu dirección:
+
+BUY: mecha enorme hacia abajo.
+
+SELL: mecha enorme hacia arriba.
+
+La mecha atraviesa EMA7, como si el mercado hubiera dicho:
+
+“Intenté seguir, pero me reventaron”.
+
+👁 CÓMO SE VE EN EL GRÁFICO
+
+BUY ideal:
+
+Vela verde con cuerpo grande.
+
+Mecha de abajo corta.
+
+Cierre cerca del máximo.
+
+Pegada a EMAs alineadas en tendencia alcista.
+
+SELL ideal:
+
+Vela roja grande.
+
+Mecha de arriba corta.
+
+Cierre cerca del mínimo.
+
+En medio de una bajada clara.
+
+❌ ERRORES TÍPICOS
+
+Tomar entradas porque “ya hay señal del EA”, aunque la vela sea un doji.
+
+Ignorar mechas enormes que muestran pelea fuerte.
+
+Pensar que “cualquier vela grande sirve”, sin ver si tiene wick brutal en contra.
+
+
+--------------------------------------------------
+🟦 MÓDULO 3 — ZONA (Fibo / SR / BOS)
+
+El EA no quiere que entres “en medio de la nada”.
+Quiere que tu entrada tenga sentido en una zona lógica.
+
+3️⃣ Zona válida (ZoneOK)
+
+El EA marca la zona como OK si se cumple al menos una de estas:
+
+Zona Fibo (0.382–0.618 de un impulso previo).
+
+Reacción de Soporte/Resistencia (SR).
+
+Break of Structure simple (BOS + retest).
+
+🔹 3.1 Fibo Zone (0.382–0.618)
+QUÉ ES
+
+El EA:
+
+Mira hacia atrás cierto número de velas (lookback).
+
+Identifica un máximo relevante y un mínimo relevante.
+
+Calcula el “impulso” entre esos dos puntos.
+
+Ubica el precio dentro de ese rango para ver si está en el retroceso 38–61%.
+
+BUY:
+
+Precio corregido desde un máximo reciente hacia la zona 0.382–0.618.
+
+SELL:
+
+Precio corregido desde un mínimo hacia la zona media Fibo.
+
+PARA QUÉ SIRVE
+
+Evita:
+
+Comprar en la cima del movimiento.
+
+Vender en el fondo del movimiento.
+
+Te mete donde las probabilidades son mejores:
+
+“Ni muy caro ni muy barato, sino en el retroceso sano.”
+
+CUÁNDO CONFIAR
+
+Ves un impulso claro (subida o bajada).
+
+Ves que el precio corrigió una parte razonable, no extremadamente poco ni todo.
+
+La señal del EA aparece cerca de esa zona media del impulso.
+
+CUÁNDO DESCONFIAR
+
+El “impulso” previo es caótico.
+
+El retroceso es mínimo (tipo 10–15%) o casi 100% (se comió todo el movimiento).
+
+Estás reaccionando a un spike aislado, no un movimiento bien formado.
+
+ERRORES TÍPICOS
+
+Forzar Fibo en cualquier dos puntos, por gusto.
+
+Llamar “zona Fibo” a retrocesos extremos.
+
+No distinguir entre impulso real y ruido.
+
+🔹 3.2 SR Reaction (soporte/resistencia sencilla)
+QUÉ ES
+
+El EA analiza velas recientes y detecta:
+
+BUY:
+
+Mecha abajo significativa + cuerpo que se aleja hacia arriba.
+
+SELL:
+
+Mecha arriba fuerte + cuerpo que se aleja hacia abajo.
+
+Es básicamente un rechazo de un nivel.
+
+PARA QUÉ SIRVE
+
+Te muestra dónde el mercado dijo:
+
+“Hasta aquí por ahora.”
+
+En BUY:
+
+Defienden pisos (soportes).
+
+En SELL:
+
+Defienden techos (resistencias).
+
+CUÁNDO CONFIAR
+
+Ves varios intentos de romper un nivel y la última vela deja una cola larga contra ese nivel.
+
+El cierre de la vela se aleja claramente del área donde dejó la mecha.
+
+CUÁNDO DESCONFIAR
+
+Mechas pequeñas, cuerpo costalado pegado al nivel.
+
+No ves un nivel claro, solo ruido.
+
+La reacción ocurre en pleno rango consolidado, sin contexto de tendencia.
+
+🔹 3.3 BOS Simple (Break of Structure + pequeño retest)
+QUÉ ES
+
+El EA revisa:
+
+BUY:
+
+Si el precio rompe un máximo reciente (estructura previa).
+
+Luego, si el cierre siguiente se mantiene cerca de ese nivel (retest ligero).
+
+SELL:
+
+Rompe un mínimo importante.
+
+Cierre actual cerca de ese piso, desde abajo.
+
+PARA QUÉ SIRVE
+
+Te dice:
+
+“No solo estamos moviéndonos: acabamos de romper una estructura que marcaba el rango anterior.”
+
+Eso suele ser:
+
+Arranque de nueva tendencia.
+
+Continuación fuerte de la actual.
+
+CUÁNDO CONFIAR
+
+Ves claramente un máximo o mínimo que “mandaba” el movimiento previo.
+
+El rompimiento es evidente (vela que sale, no micro-falso rompimiento).
+
+La señal aparece en el retest o justo después del rompimiento.
+
+CUÁNDO DESCONFIAR
+
+Se rompe un pico/valle irrelevante.
+
+El rompimiento parece más un spike que una ruptura sólida.
+
+El retest se mete profundamente del otro lado: rompe y regresa al rango.
+
+👁 RESUMEN VISUAL DEL MÓDULO ZONA
+
+Cuando llega una alerta WavesEMAS:
+
+Pregunta:
+“¿Estoy en una zona inteligente o en medio de la nada?”
+
+Si puedes decir:
+
+“Aquí hubo impulso y retroceso Fibo razonable”
+
+o “Aquí hay un soporte/resistencia claro”
+
+o “Esto acaba de romper una estructura clave y la zona tiene sentido”
+
+→ ZonaOK tiene peso real.
+
+Si te cuesta ver la lógica → calidad baja.
+
+
+--------------------------------------------------
+
+🟦 MÓDULO 4 — ENERGÍA (ATR PERCENTIL)
+4️⃣ Energía del mercado (percentil de ATR)
+QUÉ ES
+
+ATR mide cuánta distancia recorre el precio en promedio por vela.
+El EA:
+
+Calcula ATR actual (en pips).
+
+Lo compara con un histórico reciente (ej. últimas X velas).
+
+Determina en qué “percentil” está.
+
+En la alerta lo ves como:
+
+⚡ Energía: ALTA (ATR=26 pips)
+
+MEDIA
+
+BAJA
+
+PARA QUÉ SIRVE
+
+Responde:
+
+“¿El mercado tiene gasolina para mover mi trade…
+o está caminando medio muerto?”
+
+Si ATR actual es:
+
+Alto vs su historial → mercado activo.
+
+Bajo → mercado lento, rangos cortos.
+
+CUÁNDO CONFIAR
+
+Energía ALTA (percentil ≥70%):
+
+Perfecto para trades de impulso.
+
+Energía MEDIA (percentil 40–70%):
+
+Aún bueno, pero no esperes rallies gigantes.
+
+CUÁNDO DESCONFIAR
+
+Energía BAJA (percentil bajo):
+
+Velas pequeñas.
+
+Mercados de domingo, horarios muertos, pre-apertura floja.
+
+Te pueden sacar por ruido o no alcanzar TP nunca.
+
+Regla simple mental:
+
+Energía BAJA + Espacio CORTO =
+Ni lo intentes.
+
+
+--------------------------------------------------
+
+🟦 MÓDULO 5 — ESPACIO (roomATR)
+5️⃣ Espacio para correr (roomATR)
+QUÉ ES
+
+El EA calcula:
+
+roomATR = Distancia al siguiente SR relevante / ATR
+
+
+Te dice básicamente:
+
+“¿Cuántos ATR tienes libres desde tu entrada hasta la siguiente pared?”
+
+En la alerta lo ves como:
+
+📏 Espacio: SUFICIENTE (4.72x ATR - ATR=26 pips ≈ 122 pips)
+
+PARA QUÉ SIRVE
+
+Te ayuda a contestar:
+
+“¿Tiene sentido pensar en RR 1:2 o 1:3 en esta zona…
+o estoy frente a un muro pegado?”
+
+Si tu SL ≈ 1×ATR, y roomATR:
+
+≥ 2×ATR → perfecto para RR 1:2.
+
+≥ 3×ATR → perfecto para RR mayores.
+
+CUÁNDO CONFIAR
+
+roomATR ≥ 1.5 → SUFICIENTE (buena confluencia).
+
+roomATR ≥ 2 → muy buena para trades serios.
+
+Próximo SR está lejos, ves “campo abierto”.
+
+CUÁNDO DESCONFIAR
+
+roomATR < 1.0 → espacio corto.
+
+Ves niveles horizontales cercanos (máximos/mínimos previos, zonas de congestión) muy cerca.
+
+Aunque el EA no te prohíbe entrar con room bajo, tú mentalmente puedes aplicar:
+
+“Si roomATR < 1.2, este trade no entra a la categoría AAA.”
+
+
+--------------------------------------------------
+
+🟦 MÓDULO 6 — COSTO (SPREAD)
+6️⃣ Spread relativo a ATR
+QUÉ ES
+
+El EA convierte el spread del símbolo en pips y lo compara con el ATR:
+
+SpreadATR = spread / ATR
+
+Lo clasifica como:
+
+BAJO (≤ 0.5×ATR)
+
+NORMAL (≤ 1.0×ATR)
+
+ALTO / MUY ALTO (> 1.0 o 1.5×ATR)
+
+PARA QUÉ SIRVE
+
+Si tu spread:
+
+Es pequeño ⇒ tu SL real es lo que tú crees.
+
+Es grande ⇒ parte de tu SL se lo come el costo de entrar.
+
+Spread alto en relación al ATR:
+
+Deforma tu R:R.
+
+Te vuelve menos competitivo.
+
+CUÁNDO CONFIAR
+
+Costo BAJO o NORMAL.
+
+Sesiones de buena liquidez (Londres / NY en FX, horas fuertes en índices / cripto).
+
+CUÁNDO DESCONFIAR
+
+Spread ALTO o MUY ALTO.
+
+Horario muerto (aperturas raras, fines de semana en cripto con poca liquidez).
+
+Símbolos exóticos o con poca profundidad.
+
+Aunque el EA marque señal, tu criterio puede ser:
+
+“Setups AAA + spread ALTO = baja categoría a A o B, o la ignoro.”
+
+
+--------------------------------------------------
+
+🟦 MÓDULO 7 — CÓMO DECIDIR: BASURA / BUENA / AAA
+
+Cuando llega una alerta WavesEMAS a Telegram, tu flujo mental debería ser:
+
+🪜 PASO 1 — Checar tendencia (Módulo 1)
+
+¿EMAs 7, 20, 50 alineadas y con pendiente clara?
+
+¿Precio del lado correcto de EMA20?
+
+Si NO hay tendencia clara → descartado, sin más.
+
+🪜 PASO 2 — Ver la vela actual (Módulo 2)
+
+¿Cuerpo relativamente grande vs velas recientes?
+
+¿No es un doji o vela microscópica?
+
+¿Mecha contra tu dirección es pequeña/moderada?
+
+¿No ves un rechazo masivo contra ti?
+
+Si la vela es débil → baja calidad o ignorar.
+
+🪜 PASO 3 — Validar zona (Módulo 3)
+
+¿Ves:
+
+retroceso sano tipo Fibo,
+
+reacción SR clara,
+
+o rompimiento + retest (BOS)?
+
+¿El movimiento tiene sentido en el mapa del precio?
+
+Si no ves una razón lógica para entrar en esa zona → el trade NO es AAA.
+
+🪜 PASO 4 — Leer energía y espacio (Módulos 4 y 5)
+
+⚡ Energía: ¿ALTA o al menos MEDIA?
+
+📏 Espacio: ¿SUFICIENTE o ACEPTABLE (≥1.5×ATR) y con varios ATR disponibles?
+
+Energía BAJA + Espacio CORTO = no tocar.
+
+🪜 PASO 5 — Revisar spread (Módulo 6)
+
+💸 Costo: ¿BAJO o NORMAL?
+
+Si es ALTO/MUY ALTO, ¿vale la pena de verdad?
+
+🪜 PASO 6 — Clasificar el setup
+
+Cuenta confluencias cumplidas:
+
+Confluencias obligatorias (núcleo):
+
+Tendencia clara (EMAs alineadas + precio del lado correcto).
+
+Vela con cuerpo decente.
+
+Sin mecha fuerte contra tendencia clavada en EMA7.
+
+Zona válida (Fibo / SR / BOS).
+
+Espacio ≥ 1.0 ATR.
+
+Energía ≥ MEDIA.
+
+Spread ≤ 1.0 ATR.
+
+Mi sugerencia:
+
+⭐⭐ AAA / AAA+
+
+Todas las obligatorias ✔
+
+Zona visualmente muy clara
+
+roomATR ≥ 1.5–2
+
+Energía MEDIA/ALTA
+
+Sin descalificadores obvios
+
+✅ Buena / A
+
+5–6 obligatorias ✔
+
+Alguna condición ligeramente justa (spread algo más alto, espacio un poco menor).
+
+⚪ Decente / B
+
+4 obligatorias ✔
+
+Más para entrenamiento que para buscar “golpes top”.
+
+❌ Basura / NO TRADE
+
+Menos de 4 obligatorias ✔
+
+O cualquier descalificador fuerte muy evidente.
+
+
+
+FIN DEL MANUAL
+
+
+
+
+
+
+
+
+

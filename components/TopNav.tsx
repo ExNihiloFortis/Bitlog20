@@ -59,6 +59,7 @@ export default function TopNav() {
           <a className="btn-nav" href="/field-edits">Field Edits</a>
           <a className="btn-nav" href="/import">Import</a>
           <a className="btn-nav" href="/charts">Charts</a>
+          <a className="btn-nav" href="/checklist">Checklist</a>
         </div>
 
         {/* Buscar ticket */}

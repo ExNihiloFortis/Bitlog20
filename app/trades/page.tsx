@@ -264,50 +264,52 @@ export default function TradesPage() {
     return xs;
   }, [rows, orderBy, orderAsc]);
 
-  // ---------- Eliminar ----------
-  
- 
- async function onDelete(id: number) {
-  if (!confirm("¿Seguro que quieres borrar este trade y sus imágenes?")) return;
 
-  const { data: sess } = await supabase.auth.getSession();
-  const token = sess.session?.access_token;
+  // ---------- Eliminar [D1] ----------
+  async function onDelete(id: number) {
+    if (!confirm("¿Seguro que quieres borrar este trade y sus imágenes?")) return;
 
-  if (!token) {
-    alert("No hay sesión válida. Inicia sesión.");
-    return;
-  }
+    // [D1.1] Obtener token de sesión para llamar a la función delete_trade
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
 
-  const resp = await fetch(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete_trade`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ trade_id: id }),
+    if (!token) {
+      alert("No hay sesión válida. Inicia sesión.");
+      return;
     }
-  );
 
-  if (!resp.ok) {
-    const info = await resp.json().catch(() => ({}));
-    console.error("delete_trade error", info);
-    alert("Error borrando trade.");
-    return;
+    const resp = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete_trade`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ trade_id: id }),
+      }
+    );
+
+    if (!resp.ok) {
+      const info = await resp.json().catch(() => ({}));
+      console.error("delete_trade error", info);
+      alert("Error borrando trade.");
+      return;
+    }
+
+    // [D1.2] ÉXITO: actualizar estado local sin recargar la página
+    // - Quitamos el trade del array de rows
+    // - Ajustamos contador total y páginas
+    setRows((prev) => prev.filter((r) => r.id !== id));
+
+    const newTotal = Math.max(0, total - 1);
+    setTotal(newTotal);
+    setTotalPages(Math.max(1, Math.ceil(newTotal / PAGE)));
+    // No tocamos pageIdx ni noMore: el usuario sigue en la misma vista, solo sin ese trade.
   }
-  
-  
-  // 👇 AQUÍ el fix visual: recargamos la tabla
-  window.location.reload();
-  
-  // 👉 NO TOCAR NADA MÁS
-  // Tu tabla NO usa setRows. Se recarga sola.
-  // Nada que agregar aquí.
-}
 
- 
+
   // ---------- UI ----------
   return (
     <>

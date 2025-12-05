@@ -25,12 +25,28 @@ type TradeRow = {
   session: string | null;
   dt_open_utc: string | null;
   dt_close_utc: string | null;
+  // --- Campos extra para export PRO ---
+  volume: number | null;
+  entry_price: number | null;
+  exit_price: number | null;
+  pips: number | null;
+  rr_objetivo: string | null;
   pnl_usd_gross: number | null;
+  pnl_usd_net: number | null;
+  fee_usd: number | null;
+  swap: number | null;
   ea: string | null;
+  ea_signal: string | null;
+  ea_score: number | null;
+  ea_tp1: string | null;
+  ea_tp2: string | null;
+  ea_tp3: string | null;
+  ea_sl1: string | null;
   patron: string | null;
   vela: string | null;
   tendencia: string | null;
   emocion: string | null;
+  notes: string | null;
   close_reason: string | null;
 };
 
@@ -262,6 +278,7 @@ function TopNav() {
         <a className="btn-nav" href="/field-edits">Field Edits</a>
         <a className="btn-nav" href="/import">Import</a>
         <a className="btn-nav" href="/charts">Charts</a>
+        <a className="btn-nav" href="/checklist">Checklist</a>
       </div>
     </nav>
   );
@@ -600,7 +617,9 @@ export default function ChartsPage() {
     filterSession,
   ]);
 
-  // Exportar CSV de trades filtrados
+  /* ============================================================
+   * [BLOCK 1] Export CSV PRO – todas las columnas clave del trade
+   * ============================================================ */
   const handleExportCsv = () => {
     if (!visibleTrades.length) return;
 
@@ -609,17 +628,31 @@ export default function ChartsPage() {
       "ticket",
       "symbol",
       "timeframe",
-      "side",
       "session",
       "dt_open_utc",
       "dt_close_utc",
+      "side",
+      "volume",
+      "entry_price",
+      "exit_price",
+      "pips",
+      "rr_objetivo",
       "pnl_usd_gross",
+      "pnl_usd_net",
+      "fee_usd",
+      "swap",
       "ea",
+      "ea_signal",
+      "ea_score",
+      "ea_tp1",
+      "ea_tp2",
+      "ea_tp3",
+      "ea_sl1",
       "patron",
       "vela",
       "tendencia",
       "emocion",
-      "close_reason",
+      "notes",
     ];
 
     const escapeCell = (value: any) => {
@@ -637,17 +670,31 @@ export default function ChartsPage() {
         t.ticket ?? "",
         t.symbol ?? "",
         t.timeframe ?? "",
-        t.side ?? "",
         t.session ?? "",
         t.dt_open_utc ?? "",
         t.dt_close_utc ?? "",
+        t.side ?? "",
+        t.volume ?? "",
+        t.entry_price ?? "",
+        t.exit_price ?? "",
+        t.pips ?? "",
+        t.rr_objetivo ?? "",
         t.pnl_usd_gross ?? "",
+        t.pnl_usd_net ?? "",
+        t.fee_usd ?? "",
+        t.swap ?? "",
         t.ea ?? "",
+        t.ea_signal ?? "",
+        t.ea_score ?? "",
+        t.ea_tp1 ?? "",
+        t.ea_tp2 ?? "",
+        t.ea_tp3 ?? "",
+        t.ea_sl1 ?? "",
         t.patron ?? "",
         t.vela ?? "",
         t.tendencia ?? "",
         t.emocion ?? "",
-        t.close_reason ?? "",
+        t.notes ?? "",
       ]
         .map(escapeCell)
         .join(",")
@@ -658,7 +705,7 @@ export default function ChartsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "bitlog_trades_export.csv";
+    a.download = "bitlog_trades_export_pro.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

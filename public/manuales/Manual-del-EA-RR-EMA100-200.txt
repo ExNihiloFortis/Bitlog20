@@ -1,0 +1,613 @@
+
+📘 MÓDULO 0 — VISIÓN GENERAL DEL EA REBOTE / ROMPIMIENTO EN EMA DE 100/200
+
+Este EA NO abre operaciones.
+Su trabajo es avisarte:
+
+“Oye, el precio está rebotando en la EMA100/200 con buena pinta”
+
+“Oye, el precio acaba de romper la EMA100/200 con fuerza”
+
+Tu trabajo como trader es:
+abrir Bitlog → abrir el checklist → revisar confluencias → decidir si:
+
+❌ No operar
+
+✅ Operación normal
+
+⭐ Operación AAA/AAA+ (las que cuentan para tu futuro depa frente al mar)
+
+Todo lo que vamos a ver a continuación responde a 5 preguntas por cada confluencia:
+
+Qué es
+
+Para qué sirve
+
+Cuándo confiar / cuándo desconfiar
+
+Cómo se ve en el gráfico (H1/H4)
+
+Errores típicos a evitar
+
+
+--------------------------------------
+
+🟦 MÓDULO 1 — REBOTE EN EMA100/200
+🔵 1. CONFLUENCIAS OBLIGATORIAS (sin estas, ni lo pienses)
+1️⃣ Tendencia definida
+
+🔹 QUÉ ES
+
+La dirección clara en la que se está moviendo el mercado en ese timeframe.
+
+BUY (rebote alcista):
+EMA100 y EMA200 inclinadas hacia arriba.
+
+SELL (rebote bajista):
+EMA100 y EMA200 inclinadas hacia abajo.
+
+PLANA = PROHIBIDO:
+Cuando las EMAs van casi horizontales, no hay tendencia, hay ruido.
+
+🎯 PARA QUÉ SIRVE
+
+Filtra el 80% de las operaciones basura.
+Los rebotes en EMA100/200 funcionan mejor DENTRO de una tendencia, no en un mercado en rango.
+
+📆 CUÁNDO CONFIAR
+
+Cuando al mirar rápido el gráfico, sin pensar, tu cerebro dice:
+“Esto claramente va para arriba” o “claramente va para abajo”.
+
+Cuando ves máximos y mínimos ordenados:
+
+Alcista: HL → HL → HL
+
+Bajista: LH → LH → LH
+
+⚠ CUÁNDO DESCONFIAR
+
+EMAs entrelazadas o casi horizontales.
+
+El precio cruza las EMAs cada rato como si fuera una licuadora.
+
+Máximos/mínimos desordenados.
+
+👁 CÓMO SE VE EN H1/H4
+
+En una buena tendencia alcista:
+
+EMA200 abajo, suave, inclinada.
+
+EMA100 arriba de la 200, pero también inclinada.
+
+Precio por encima de ambas, con retrocesos ordenados.
+
+❌ ERRORES TÍPICOS
+
+Ver “tendencia” donde solo hay un movimiento fuerte pero aislado.
+
+Forzar trades porque “ya quiero entrar”, aunque la EMA esté plana.
+
+Confundir microestructura en M15 con tendencia real en H4.
+
+2️⃣ Toque real a la EMA100 o EMA200
+
+🔹 QUÉ ES
+
+El momento exacto en que el precio REALMENTE interactúa con la EMA, no “más o menos”.
+
+Formas válidas de toque:
+
+Mecha tocando la EMA.
+
+Cuerpo tocando la EMA.
+
+Precio a menos de 0.10% de distancia (casi pegado).
+
+🎯 PARA QUÉ SERVE
+
+Para diferenciar entre:
+
+Rebote REAL en la “pared institucional” (EMA100/200)
+
+Simple corrección que pasa cerca pero no llega (mucho menos confiable)
+
+📆 CUÁNDO CONFIAR
+
+Cuando ves la mecha literalmente “besando” la EMA.
+
+Cuando el cuerpo o la mecha la atraviesan un poco y luego se alejan.
+
+⚠ CUÁNDO DESCONFIAR
+
+Si la vela se queda a un buen tramo.
+
+Si la distancia es visible sin ni siquiera hacer zoom.
+
+Si el EA dice “rebote”, pero el gráfico dice “casi rebote”.
+
+👁 CÓMO SE VE
+
+En el gráfico ves literalmente la EMA tocando la mecha como si fuera un techo o piso invisible.
+
+❌ ERRORES TÍPICOS
+
+Aceptar “casi toques” como si fueran rebotes.
+
+Tomar operaciones antes de que el precio llegue a la EMA por prisa.
+
+No respetar el criterio de proximidad estricta.
+
+3️⃣ Rechazo claro de la EMA (vela de rechazo)
+
+🔹 QUÉ ES
+
+La vela que dice:
+“Llegamos a la EMA, intentamos cruzarla… pero el lado opuesto ganó”.
+
+Características:
+
+Mecha toca la EMA.
+
+El cierre se aleja en dirección contraria.
+
+El cuerpo muestra intención (no es micro-doji sin fuerza).
+
+🎯 PARA QUÉ SIRVE
+
+Es la señal de que alguien grande defendió ese nivel.
+Si no hay rechazo → no hay rebote, solo contacto.
+
+📆 CUÁNDO CONFIAR
+
+Cuando ves mecha larga hacia la EMA y cierre lejos, en el otro extremo.
+
+Cuando aparece cerca de una zona donde antes ya hubo reacción.
+
+⚠ CUÁNDO DESCONFIAR
+
+Mechas cortas, cuerpo minúsculo → indecisión, no rechazo.
+
+Vela que “toca” pero cierra casi encima de la EMA.
+
+Vela fea en medio de consolidación.
+
+👁 CÓMO SE VE
+
+Ejemplo rebote alcista:
+
+Mecha abajo que atraviesa o toca la EMA.
+
+Cierre arriba, con cuerpo razonable.
+
+Rebote bajista = al revés.
+
+❌ ERRORES TÍPICOS
+
+Creer que cualquier vela con mecha ya es “rechazo fuerte”.
+
+No mirar el contexto: un rechazo en pleno rango sigue siendo basura.
+
+4️⃣ Vela de confirmación fuerte
+
+🔹 QUÉ ES
+
+La vela que confirma:
+“No solo rechazamos, ahora empezamos a movernos en serio.”
+
+Puede ser:
+
+Engulfing
+
+Marubozu parcial
+
+Hammer perfecto (para compras)
+
+Shooting star (para ventas, en el sitio correcto)
+
+Morning Star en EMA100/200
+
+🎯 PARA QUÉ SIRVE
+
+Te evita entrar en falsos rebotes donde hay mecha bonita… y luego nada.
+Es la diferencia entre un “amague” y un real cambio de intención.
+
+📆 CUÁNDO CONFIAR
+
+Cuando la vela de confirmación rompe el máximo (en compra) o mínimo (en venta) de la vela de rechazo.
+
+Cuando el cuerpo es claramente dominante, no una microvelita simbólica.
+
+⚠ CUÁNDO DESCONFIAR
+
+Si la confirmación es una vela pequeña o doji.
+
+Si la confirmación se da con volumen bajo.
+
+Si la “confirmación” no rompe nada importante (no hay estructura).
+
+👁 CÓMO SE VE
+
+Ideal:
+
+Vela de rechazo en la EMA.
+
+Justo después, una vela grande, del color del rebote, cerrando lejos de la EMA.
+
+❌ ERRORES TÍPICOS
+
+Entrar solo con la vela de rechazo, sin confirmación.
+
+Ver como “engulfing” cualquier vela que tapa ligeramente a otra.
+
+No distinguir patrones bien formados de deformes.
+
+🟡 2. CONFLUENCIAS FUERTES DEL REBOTE (para setups AA/AAA+)
+5️⃣ Estructura previa sana (HL/LH)
+
+🔹 QUÉ ES
+
+La historia que te cuenta el precio antes de tocar la EMA.
+
+Para BUY: HL → HL → HL (mínimos cada vez más altos)
+
+Para SELL: LH → LH → LH (máximos cada vez más bajos)
+
+🎯 PARA QUÉ SIRVE
+
+Te dice si el rebote forma parte de un “patrón sano” de tendencia, o si es un movimiento aislado.
+
+📆 CUÁNDO CONFIAR
+
+Cuando puedes trazar a simple vista esa estructura sin forzarla.
+
+Cuando el rebote en EMA respeta ese patrón.
+
+⚠ CUÁNDO DESCONFIAR
+
+Precios caóticos, sube-baja sin orden.
+
+Nuevos mínimos en tendencia supuestamente alcista, o viceversa.
+
+❌ ERRORES TÍPICOS
+
+Dibujar HL/LH donde no hay tal solo para autoengañarte.
+
+Operar rebotes contra estructura muy clara (es arriesgar de más).
+
+6️⃣ Volumen de apoyo en rechazo o confirmación
+
+🔹 QUÉ ES
+
+Que la vela de rechazo o la de confirmación venga acompañada de volumen superior al promedio.
+
+🎯 PARA QUÉ SIRVE
+
+Volume = gasolina.
+Sin gasolina, el rebote no tiene por qué recorrer mucho.
+
+📆 CUÁNDO CONFIAR
+
+Volumen > 120% del promedio de las últimas 20 velas.
+
+Especialmente si coincide con vela de confirmación fuerte.
+
+⚠ CUÁNDO DESCONFIAR
+
+Volumen bajo con vela bonita → puede ser puro ruido.
+
+Volumen alto pero vela indecisa → batalla, no resultado claro.
+
+7️⃣ Gran distancia previa del precio a la EMA
+
+🔹 QUÉ ES
+
+Qué tanto se había alejado el precio de la EMA antes de volver a tocarla.
+
+🎯 PARA QUÉ SIRVE
+
+Entre más se estira la liga, más fuerte puede ser el rebote cuando vuelve al promedio.
+
+📆 CUÁNDO CONFIAR
+
+Cuando el precio estuvo “muy arriba” o “muy abajo” de la EMA durante varias velas, y regresa a “besar” la media.
+
+⚠ CUÁNDO DESCONFIAR
+
+Si el precio está pegado a la EMA casi siempre → no hay estiramiento, no hay resorte.
+
+8️⃣ Primer toque en >30 velas
+
+🔹 QUÉ ES
+
+Que no haya habido toques recientes a la misma EMA.
+
+🎯 PARA QUÉ SIRVE
+
+Estadísticamente, el primer toque en una EMA importante después de un tramo largo suele ser el más potente.
+
+📆 CUÁNDO CONFIAR
+
+Cuando revisas 30 velas atrás y no ves ningún toque previo a esa EMA.
+
+⚠ CUÁNDO DESCONFIAR
+
+Si la EMA ha sido tocada 3–4 veces en pocas velas: el nivel se debilita.
+
+9️⃣ Confluencia con zona de oferta/demanda (SD)
+
+🔹 QUÉ ES
+
+Cuando la EMA100/200 coincide con una zona donde el precio antes se giró violentamente (base de un rally, base de un drop, etc.).
+
+🎯 PARA QUÉ SIRVE
+
+EMA + SD = nivel doblemente defendido.
+Muy usado por institucionales.
+
+📆 CUÁNDO CONFIAR
+
+Cuando ves claramente una zona de acumulación o distribución en el pasado justo en la misma franja.
+
+⚠ CUÁNDO DESCONFIAR
+
+Zonas mal dibujadas, enormes, que abarcan medio gráfico.
+
+Nivel de SD inventado porque “quiero que haya confluencia”.
+
+🔴 3. DESCALIFICADORES DEL REBOTE (ROMPEN EL SETUP)
+
+EMAs planas → mercado sin dirección.
+
+Vela enorme en contra justo antes del toque → posible rompimiento en lugar de rebote.
+
+Mechas largas hacia ambos lados → guerra sin ganador.
+
+Consolidación prolongada antes del toque → energía diluida.
+
+Noticias gordas cerca → caos.
+
+EMA100 y EMA200 muy juntas → mercado estrecho, sin espacio.
+
+Si ves uno de estos bien marcado:
+👉 se invalida el setup de rebote, aunque el EA haya pitado.
+
+
+--------------------------------------
+
+🟥 MÓDULO 2 — ROMPIMIENTO EN EMA100/200
+🔵 1. CONFLUENCIAS OBLIGATORIAS
+1️⃣ Cierre completo fuera de la EMA
+
+🔹 QUÉ ES
+
+Una vela que termine claramente al otro lado de la EMA:
+
+TODO el cuerpo fuera.
+
+A cierta distancia (≈0.10% o más).
+
+🎯 PARA QUÉ SIRVE
+
+Diferencia entre:
+“Probamos pasar” vs “Pasamos y dejamos la puerta atrás”.
+
+📆 CUÁNDO CONFIAR
+
+Cuerpo completo fuera, sin duda visual.
+
+No tienes que hacer zoom para verlo.
+
+⚠ CUÁNDO DESCONFIAR
+
+Parte del cuerpo sigue tocando la EMA.
+
+Cierre justo encima/abajo sin convicción.
+
+2️⃣ Cuerpo fuerte (vela de expansión)
+
+🔹 QUÉ ES
+
+La vela que hace el rompimiento tiene un cuerpo dominante.
+
+Cuerpo ≥ 60% del rango de la vela.
+
+🎯 PARA QUÉ SIRVE
+
+Te dice que hubo decisión, no solo un empujoncito.
+
+📆 CUÁNDO CONFIAR
+
+Vela larga, clara, limpia.
+
+No parece un chicle estirado, sino una barra sólida.
+
+⚠ CUÁNDO DESCONFIAR
+
+Vela tipo doji o con cuerpo muy pequeño.
+
+Vela llena de mechas arriba y abajo.
+
+3️⃣ Wick opuesta pequeña
+
+🔹 QUÉ ES
+
+La mecha en el lado contrario del rompimiento (pullback interno de la vela) es pequeña.
+
+🎯 PARA QUÉ SIRVE
+
+Demuestra que el lado opuesto no pudo contra el movimiento.
+
+📆 CUÁNDO CONFIAR
+
+Wick opuesta < 25% del total de la vela.
+
+⚠ CUÁNDO DESCONFIAR
+
+Wick grande en el lado opuesto → rechazo del rompimiento.
+
+4️⃣ Volumen alto
+
+🔹 QUÉ ES
+
+Volumen superior al promedio acompañando la vela de rompimiento.
+
+🎯 PARA QUÉ SIRVE
+
+Rompimiento sin volumen = rumor.
+Rompimiento con volumen = evento real.
+
+📆 CUÁNDO CONFIAR
+
+Volumen ≥ 100–120% del promedio 20 velas.
+
+⚠ CUÁNDO DESCONFIAR
+
+Volumen por debajo del promedio.
+
+Volumen altísimo pero con vela indecisa (igual hay absorción, no rompimiento).
+
+🟡 2. CONFLUENCIAS FUERTES DEL ROMPIMIENTO
+5️⃣ Retesteo limpio
+
+🔹 QUÉ ES
+
+Después del rompimiento, el precio regresa a la zona de la EMA:
+
+Toca con mecha.
+
+No penetra con cuerpo.
+
+Luego sale en dirección del rompimiento.
+
+🎯 PARA QUÉ SIRVE
+
+Es la típica jugada institucional:
+romper → testear → ampliar.
+
+📆 CUÁNDO CONFIAR
+
+Retesteo con vela de rechazo y luego confirmación.
+
+No hay consolidación eterna en el retest.
+
+⚠ CUÁNDO DESCONFIAR
+
+El retesteo se mete completamente del otro lado (rompimiento fallido).
+
+Retest múltiple, una y otra vez, sin avanzar.
+
+6️⃣ Break of Structure (BOS) real
+
+🔹 QUÉ ES
+
+El rompimiento de un máximo o mínimo importante, no de un micro-pico.
+
+🎯 PARA QUÉ SIRVE
+
+Romper la EMA + romper un nivel clave = cambio de régimen, no solo ruido.
+
+📆 CUÁNDO CONFIAR
+
+El rompimiento rompe el último high/low que definía la tendencia anterior.
+
+⚠ CUÁNDO DESCONFIAR
+
+Si sólo rompe un nivel menor irrelevante.
+
+7️⃣ Continuación posterior
+
+🔹 QUÉ ES
+
+La vela siguiente al rompimiento:
+
+Sigue en la misma dirección
+
+O consolida ligeramente para luego continuar.
+
+🎯 PARA QUÉ SIRVE
+
+Valida que el rompimiento no fue solo un spike.
+
+📆 CUÁNDO CONFIAR
+
+Segunda vela fuerte a favor.
+
+O inside bar que después rompe en la misma dirección.
+
+⚠ CUÁNDO DESCONFIAR
+
+Reversión inmediata con vela contraria grande.
+
+Patrón de “V” inmediato.
+
+8️⃣ Pendiente fuerte de la EMA
+
+🔹 QUÉ ES
+
+Que la EMA ya venía con inclinación fuerte antes del rompimiento (ya definimos criterios: ≥8 velas, ≥0.30% de cambio, etc.).
+
+🎯 PARA QUÉ SIRVE
+
+Rompimiento en EMA “viva” = continuación fuerte.
+Rompimiento en EMA plana = puede ser ruido.
+
+9️⃣ FVG reciente
+
+🔹 QUÉ ES
+
+Un hueco de valor justo después del rompimiento (vela que deja rango sin tradeado entre cuerpo y mechas posteriores).
+
+🎯 PARA QUÉ SIRVE
+
+Indica que el movimiento fue tan rápido que el mercado “no alcanzó” a transar todo.
+Típica firma algorítmica.
+
+🔴 3. DESCALIFICADORES DEL ROMPIMIENTO
+
+Rompimientos con cuerpo pequeño.
+
+Wick muy grande en contra.
+
+Mucha consolidación justo antes del rompimiento.
+
+Volumen bajo.
+
+Noticias de alto impacto inmediato.
+
+EMA100 y EMA200 muy juntas → rango.
+
+
+--------------------------------------
+
+🟨 MÓDULO 3 — CÓMO DECIDIR: MALA / BUENA / AAA+
+
+Cuando te llegue una señal del EA a Telegram:
+
+Abres el gráfico (H1/H4).
+
+Abres tu checklist en Bitlog.
+
+Empiezas a marcar:
+
+Si faltan confluencias obligatorias → NI LA MIRES MÁS.
+
+Si tiene obligatorias + algunas fuertes → entrada decente (A/AA).
+
+Si tiene obligatorias + varias fuertes bien marcadas + sin descalificadores →
+eso es material AAA/AAA+.
+
+Con práctica, vas a ver un gráfico y tu cerebro solito va a decir:
+
+“Basura”.
+
+“Puede ser, pero no me encanta”.
+
+“Esto es de los buenos, estos pagan el depa”.
+
+
+FIN DEL MANUAL
+
+
+
