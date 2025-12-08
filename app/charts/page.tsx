@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import TopNav from "@/components/TopNav";
 import {
   BarChart,
   Bar,
@@ -261,28 +262,17 @@ function addDaysToDateString(dateStr: string, delta: number): string {
 /* =========================
    TOP NAV (estilo Charts)
    ========================= */
-function TopNav() {
-  return (
-    <nav className="topnav" style={{ marginBottom: 12 }}>
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
-        <a className="btn-nav" href="/">Home</a>
-        <a className="btn-nav" href="/trades">Trades</a>
-        <a className="btn-nav" href="/trades/new">New</a>
-        <a className="btn-nav" href="/field-edits">Field Edits</a>
-        <a className="btn-nav" href="/import">Import</a>
-        <a className="btn-nav" href="/charts">Charts</a>
-        <a className="btn-nav" href="/checklist">Checklist</a>
-      </div>
-    </nav>
-  );
-}
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
 
 export default function ChartsPage() {
   const [loading, setLoading] = useState(true);
@@ -933,45 +923,8 @@ export default function ChartsPage() {
 
     return base;
   }, [visibleTrades]);
-
-  // Desglose por motivo de cierre
-  const perfByCloseReason = useMemo<CloseReasonRow[]>(() => {
-    const map = new Map<
-      string,
-      { trades: number; wins: number; losses: number; pnl: number }
-    >();
-
-    visibleTrades.forEach((t) => {
-      const reason = ((t.close_reason || "UNKNOWN") as string).toUpperCase();
-      if (!map.has(reason)) {
-        map.set(reason, { trades: 0, wins: 0, losses: 0, pnl: 0 });
-      }
-      const rec = map.get(reason)!;
-      rec.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: CloseReasonRow[] = [];
-    map.forEach((v, k) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        reason: k,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    rows.sort((a, b) => b.trades - a.trades);
-    return rows;
-  }, [visibleTrades]);
-
-  // Confluencias EA + símbolo + timeframe
+  
+    // Confluencias EA + Símbolo + TF (combo base)
   const combosEA_Symbol_TF = useMemo<ComboRow[]>(() => {
     const map = new Map<
       string,
@@ -990,12 +943,26 @@ export default function ChartsPage() {
       const ea = (t.ea || "SIN_EA").trim() || "SIN_EA";
       const symbol = (t.symbol || "SIN_SYMBOL").trim() || "SIN_SYMBOL";
       const tf = (t.timeframe || "SIN_TF").trim() || "SIN_TF";
+
+      // Si falta EA / símbolo / TF, no tiene sentido como combo
+      if (!ea || !symbol || !tf) return;
+
       const key = `${ea}__${symbol}__${tf}`;
       if (!map.has(key)) {
-        map.set(key, { ea, symbol, timeframe: tf, trades: 0, wins: 0, losses: 0, pnl: 0 });
+        map.set(key, {
+          ea,
+          symbol,
+          timeframe: tf,
+          trades: 0,
+          wins: 0,
+          losses: 0,
+          pnl: 0,
+        });
       }
+
       const rec = map.get(key)!;
       rec.trades += 1;
+
       const v = safeNumber(t.pnl_usd_gross);
       rec.pnl += v;
       if (v > 0) rec.wins += 1;
@@ -1017,9 +984,87 @@ export default function ChartsPage() {
       });
     });
 
+    // Orden principal: más trades primero
     rows.sort((a, b) => b.trades - a.trades);
     return rows;
   }, [visibleTrades]);
+
+  
+  
+   // Desglose por motivo de cierre (4 tipos: TP / SL / USER / NULL)
+  const perfByCloseReason = useMemo<CloseReasonRow[]>(() => {
+    const map = new Map<
+      string,
+      { trades: number; wins: number; losses: number; pnl: number }
+    >();
+
+    visibleTrades.forEach((t) => {
+      // Queremos distinguir claramente:
+      // - TP   -> TP
+      // - SL   -> SL
+      // - USER -> USER (incluye: USER, OTHER, MANUAL, user, other...)
+      // - NULL -> cuando NO hay close_reason (null, vacío, solo espacios)
+      const raw = (t.close_reason || "").trim().toUpperCase();
+
+      let reason: string;
+
+      if (!raw) {
+        // Sin valor → trade creado a mano, aún sin CSV del broker
+        reason = "NULL";
+      } else if (raw === "TP") {
+        reason = "TP";
+      } else if (raw === "SL") {
+        reason = "SL";
+      } else if (raw === "USER" || raw === "OTHER" || raw === "MANUAL") {
+        // Todo lo que signifique "cerré yo" lo agrupamos como USER
+        reason = "USER";
+      } else {
+        // Cualquier otro texto raro, lo mandamos a USER para no perderlo
+        reason = "USER";
+      }
+
+      if (!map.has(reason)) {
+        map.set(reason, { trades: 0, wins: 0, losses: 0, pnl: 0 });
+      }
+
+      const rec = map.get(reason)!;
+      rec.trades += 1;
+
+      const v = safeNumber(t.pnl_usd_gross);
+      rec.pnl += v;
+      if (v > 0) rec.wins += 1;
+      else if (v < 0) rec.losses += 1;
+    });
+
+    const rows: CloseReasonRow[] = [];
+    map.forEach((v, k) => {
+      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
+      rows.push({
+        reason: k,
+        trades: v.trades,
+        wins: v.wins,
+        losses: v.losses,
+        winRate,
+        pnl: v.pnl,
+      });
+    });
+
+    // Orden: TP, SL, USER, NULL
+    const order = ["TP", "SL", "USER", "NULL"];
+    rows.sort((a, b) => {
+      const ia = order.indexOf(a.reason);
+      const ib = order.indexOf(b.reason);
+      const na = ia === -1 ? 999 : ia;
+      const nb = ib === -1 ? 999 : ib;
+      if (na !== nb) return na - nb;
+      return b.trades - a.trades;
+    });
+
+    return rows;
+  }, [visibleTrades]);
+
+ 
+ 
 
   // Top confluencias (modo sniper)
   const topSniperCombos = useMemo(() => {
@@ -2280,14 +2325,19 @@ export default function ChartsPage() {
                     ...TD_STYLE_BASE,
                     backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
                   };
-                  const label =
-                    row.reason === "TP"
-                      ? "TP"
-                      : row.reason === "SL"
-                      ? "SL"
-                      : row.reason === "MANUAL"
-                      ? "MANUAL"
-                      : row.reason;
+                 
+       
+                      const label =
+                        row.reason === "TP"
+                            ? "TP"
+                            : row.reason === "SL"
+                            ? "SL"
+                            : row.reason === "USER"
+                            ? "USER"
+                            : row.reason === "NULL"
+                            ? "NULL"
+                            : row.reason;
+                            
                   return (
                     <tr key={row.reason}>
                       <td style={rowStyle}>{label}</td>
@@ -2996,8 +3046,8 @@ export default function ChartsPage() {
                 <th style={TH_STYLE}>TF</th>
                 <th style={TH_STYLE}>EA</th>
                 <th style={TH_STYLE}>Sesión</th>
-                <th style={TH_STYLE}>Open</th>
-                <th style={TH_STYLE}>Close</th>
+                <th style={TH_STYLE}>Open (UTC -7)</th>
+                <th style={TH_STYLE}>Close (UTC -7)</th>
                 <th style={TH_STYLE}>PnL</th>
                 <th style={TH_STYLE}>Ver</th>
               </tr>

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import TopNav from "@/components/TopNav";
+
 import ImageManager from "@/components/ImageManager";
 
 /* =========================
@@ -73,28 +75,7 @@ function formatDuration(ms: number) {
 /* =========================
    TOP NAV (estilo charts)
    ========================= */
-function TopNav() {
-  return (
-    <nav className="topnav" style={{ marginBottom: 12 }}>
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
-        <a className="btn-nav" href="/">Home</a>
-        <a className="btn-nav" href="/trades">Trades</a>
-        <a className="btn-nav" href="/trades/new">New</a>
-        <a className="btn-nav" href="/field-edits">Field Edits</a>
-        <a className="btn-nav" href="/import">Import</a>
-        <a className="btn-nav" href="/charts">Charts</a>
-        <a className="btn-nav" href="/checklist">Checklist</a>
-      </div>
-    </nav>
-  );
-}
+   
 
 
 /* =========================

@@ -41,21 +41,31 @@ type OrderKey =
   | "volume"
   | "pnl_usd_gross";
 
-const fmtDT = new Intl.DateTimeFormat("en-CA", {
+// ---------- Helpers de formato (fechas, dinero, números) ----------
+
+// Fechas en tu zona (America/Mazatlan = UTC-7)
+const fmtDT = new Intl.DateTimeFormat("es-MX", {
   dateStyle: "medium",
   timeStyle: "short",
-  timeZone: "UTC",
+  timeZone: "America/Mazatlan",
 });
+
 const fmtUSD = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   maximumFractionDigits: 2,
 });
+
 const fmtNum = new Intl.NumberFormat("en-US", { maximumFractionDigits: 5 });
 
 const cls = (...xs: (string | false | null | undefined)[]) =>
   xs.filter(Boolean).join(" ");
+
 const asDT = (s: string | null) => (s ? fmtDT.format(new Date(s)) : "");
+
+
+
+
 
 export default function TradesPage() {
   // ---------- Supabase ----------
@@ -451,8 +461,8 @@ export default function TradesPage() {
                     ["volume", "Vol"],
                     ["entry_price", "Entry"],
                     ["exit_price", "Exit"],
-                    ["dt_open_utc", "Open (UTC)"],
-                    ["dt_close_utc", "Close (UTC)"],
+                    ["dt_open_utc", "Open (UTC -7)"],
+                    ["dt_close_utc", "Close (UTC -7)"],
                     ["pnl_usd_gross", "$P&L"],
                   ].map(([k, label]) => (
                     <th key={k} onClick={() => toggleSort(k as OrderKey)}>

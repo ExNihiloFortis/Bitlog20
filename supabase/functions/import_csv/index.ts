@@ -17,7 +17,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 function json(body: unknown, init?: ResponseInit): Response {
@@ -134,6 +135,10 @@ function normCloseReason(raw: string | undefined | null): string | null {
   if (v === "time" || v.includes("timeout")) return "TIME";
   if (v === "user" || v === "manual" || v.includes("close by user")) return "MANUAL";
 
+
+
+
+
   // Cualquier otra cosa válida pero genérica
   return "OTHER";
 }
@@ -175,10 +180,17 @@ function mapRow(row: CsvRow) {
     asNum(row.commission_usd) ??
     null;
 
+  // Swap y swap_usd (soportar ambas variantes)
+  const rawSwap = asNum(row.swap);
+  const rawSwapUsd = asNum(row.swap_usd);
   const swap =
-    asNum(row.swap) ??
-    asNum(row.swap_usd) ??
-    null;
+    rawSwap !== null && rawSwap !== undefined
+      ? rawSwap
+      : rawSwapUsd ?? null;
+  const swap_usd =
+    rawSwapUsd !== null && rawSwapUsd !== undefined
+      ? rawSwapUsd
+      : rawSwap ?? null;
 
   const pnl_gross =
     asNum(row.pnl_usd_gross) ??
@@ -189,12 +201,25 @@ function mapRow(row: CsvRow) {
   const close_reason_raw = row.close_reason || row.close_reason_raw || "";
   const close_reason = normCloseReason(close_reason_raw || undefined);
 
+  // Broker info
+  const broker = (row.broker || "").trim() || null;
+  const broker_account =
+    (row.broker_account || row.account || "").trim() || null;
+  const ccy = (row.ccy || row.currency || "").trim() || null;
+  const tax_usd = asNum(row.tax_usd);
+  const status = (row.status || "").trim() || null;
+
   const app: Record<string, any> = {
     // Identidad base
     ticket: ticket0 || null,
     symbol: (row.symbol || "").trim() || null,
     timeframe: (row.timeframe || "").trim() || null,
     session: normSession(row.session) ?? null,
+
+    // Info de broker
+    broker,
+    broker_account,
+    ccy,
 
     // Campos principales de trading
     side,
@@ -217,8 +242,11 @@ function mapRow(row: CsvRow) {
     pnl_usd_gross: pnl_gross,
     fee_usd,
     swap,
+    swap_usd,
+    tax_usd,
+    status,
 
-    // EA / estrategia
+    // EA / estrategia (journaling avanzado)
     ea: row.ea || null,
     ea_signal: row.ea_signal || null,
     ea_score: asNum(row.ea_score),
@@ -227,7 +255,7 @@ function mapRow(row: CsvRow) {
     ea_tp3: row.ea_tp3 || null,
     ea_sl1: row.ea_sl1 || null,
 
-    // PA avanzada
+    // PA avanzada (journaling)
     patron: row.patron || null,
     vela: row.vela || null,
     tendencia: row.tendencia || null,
@@ -324,7 +352,10 @@ Deno.serve(async (req) => {
 
     if (!trades.length) {
       return json(
-        { code: 400, message: "No se encontraron filas con 'ticket' válido" },
+        {
+          code: 400,
+          message: "No se encontraron filas con 'ticket' válido",
+        },
         { status: 400 },
       );
     }
@@ -352,17 +383,96 @@ Deno.serve(async (req) => {
       else inserted++;
     }
 
-    // Upsert definitivo
-    const { error: upsertError } = await supabase
-      .from("trades")
-      .upsert(trades, { onConflict: "user_id,ticket" });
+    const toInsert = trades.filter(
+      (t) => !existingSet.has(String(t.ticket)),
+    );
+    const toUpdate = trades.filter((t) =>
+      existingSet.has(String(t.ticket)),
+    );
 
-    if (upsertError) {
-      console.error("Error en upsert de trades", upsertError);
-      return json(
-        { code: 500, message: "Error al guardar trades", detail: upsertError.message },
-        { status: 500 },
-      );
+    // 1) Inserts: trades nuevos (pueden traer journaling desde CSV si aplica)
+    if (toInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from("trades")
+        .upsert(toInsert, { onConflict: "user_id,ticket" });
+
+      if (insertError) {
+        console.error("Error en upsert de trades (insert)", insertError);
+        return json(
+          {
+            code: 500,
+            message: "Error al insertar trades nuevos",
+            detail: insertError.message,
+          },
+          { status: 500 },
+        );
+      }
+    }
+
+    // 2) Updates: SOLO campos de broker para trades existentes (no toca journaling)
+    if (toUpdate.length > 0) {
+      const allowedBrokerFields = [
+        "broker",
+        "broker_account",
+        "symbol",
+        "side",
+        "volume",
+        "ccy",
+        "entry_price",
+        "exit_price",
+        "dt_open_utc",
+        "dt_close_utc",
+        "opening_time_utc",
+        "closing_time_utc",
+        "swap",
+        "fee_usd",
+        "swap_usd",
+        "tax_usd",
+        "pnl_usd_gross",
+        "pnl_usd_net",
+        "status",
+        "close_reason",
+        "close_reason_raw",
+        "equity_usd",
+        "margin_level",
+      ];
+
+      const patches = toUpdate.map((t) => {
+        const patch: Record<string, any> = {
+          user_id,
+          ticket: t.ticket,
+        };
+
+        for (const key of allowedBrokerFields) {
+          const val = (t as any)[key];
+          if (val !== undefined && val !== null) {
+            patch[key] = val;
+          }
+        }
+
+        return patch;
+      });
+
+      if (patches.length > 0) {
+        const { error: updateError } = await supabase
+          .from("trades")
+          .upsert(patches, { onConflict: "user_id,ticket" });
+
+        if (updateError) {
+          console.error(
+            "Error en upsert de trades (update broker fields)",
+            updateError,
+          );
+          return json(
+            {
+              code: 500,
+              message: "Error al actualizar trades existentes",
+              detail: updateError.message,
+            },
+            { status: 500 },
+          );
+        }
+      }
     }
 
     return json({
