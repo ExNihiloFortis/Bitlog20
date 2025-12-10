@@ -23,11 +23,8 @@ const NAV_LINKS: NavLink[] = [
   { href: "/field-edits", label: "Field Edits" },
   { href: "/import", label: "Import" },
   { href: "/charts", label: "Charts" },
-  
-    // NUEVO
   { href: "/checklist", label: "Checklist" },
-  
-  // Nuevo botón /fundamental (rojo cereza)
+  { href: "/calendar", label: "Calendar" },
   { href: "/fundamental", label: "Fundamental", isFundamental: true },
 ];
 

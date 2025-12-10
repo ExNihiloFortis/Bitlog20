@@ -112,6 +112,232 @@ a.btn-del {
   border-radius: 0px !important;
 }
 
+/* ==================== [CAL-1] Calendar page ==================== */
+.calendar-year-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 10px 0 18px;
+}
+
+.calendar-year-label {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.calendar-year-btn {
+  padding: 4px 10px;
+  min-width: 36px;
+  background: #020617;
+  border: 1px solid #111827;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.calendar-year-btn:hover {
+  background: #111827;
+}
+
+.calendar-grid-year {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1100px) {
+  .calendar-grid-year {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .calendar-grid-year {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.calendar-month-mini {
+  background: #020617;
+  border: 1px solid #111827;
+  padding: 6px;
+  text-align: left;
+  cursor: pointer;
+  color: #e5e7eb;
+}
+
+.calendar-month-mini-active {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 1px #1d4ed8;
+}
+
+.calendar-month-name {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.calendar-week-header,
+.calendar-week-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.calendar-week-header {
+  font-size: 10px;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.calendar-week-cell {
+  text-align: center;
+}
+
+.calendar-day-cell {
+  min-height: 32px;
+  font-size: 10px;
+  padding: 2px 3px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  background: #020617;
+  color: #9ca3af;
+}
+
+.calendar-day-empty {
+  background: transparent;
+  border: none;
+}
+
+.calendar-day-has-trades {
+  border-color: #1f2937;
+}
+
+.calendar-day-pos {
+  background: #022c22;
+}
+
+.calendar-day-neg {
+  background: #3f0f0f;
+}
+
+.calendar-day-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.calendar-day-number-mini {
+  font-size: 10px;
+  font-weight: 600;
+  margin-bottom: 1px;
+}
+
+.calendar-day-info-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* [CAL-UI] Mejorar visibilidad del P&L diario en los mini-calendarios */
+.calendar-day-pnl-mini {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+}
+
+
+.calendar-day-count-mini {
+  font-size: 9px;
+  color: #6b7280;
+}
+
+/* --- Mes grande (detalle) --- */
+
+.calendar-month-detail {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #1f2937;
+}
+
+.calendar-month-detail-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.calendar-month-big {
+  margin-top: 4px;
+}
+
+.calendar-week-header-big {
+  margin-bottom: 4px;
+}
+
+.calendar-week-row-big {
+  margin-bottom: 4px;
+}
+
+.calendar-day-cell-big {
+  min-height: 70px;
+}
+
+.calendar-day-number-big {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.calendar-day-info-big {
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+/* Mejorar visibilidad del P&L diario en el mes grande */
+.calendar-day-pnl-big {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #ffffff;
+}
+
+
+.calendar-day-count-big {
+  font-size: 9px;
+  color: #6b7280;
+}
+
+.calendar-day-trades-list {
+  margin-top: 2px;
+  max-height: 40px;
+  overflow: hidden;
+}
+
+.cal-trade-pos,
+.cal-trade-neg {
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.cal-trade-pos {
+  color: #34d399;
+}
+
+.cal-trade-neg {
+  color: #f87171;
+}
+
+.calendar-trade-symbol {
+  color: #9ca3af;
+  font-size: 9px;
+}
+
+.calendar-month-footer {
+  margin-top: 10px;
+  text-align: right;
+  font-size: 13px;
+}
 
 
 
