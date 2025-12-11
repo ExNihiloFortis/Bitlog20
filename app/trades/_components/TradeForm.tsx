@@ -76,14 +76,6 @@ type TradeFormState = {
   notas: string;
 };
 
-
-
-
-
-
-
-
-
 // ===================== [TF5] Helper: carga de catálogos desde Supabase =====================
 async function loadOptions(type: string): Promise<Opt[]> {
   const { data } = await supabase
@@ -125,7 +117,6 @@ export type TradeFormValues = {
 // Modo de uso del formulario: crear o editar
 type TradeFormMode = "create" | "edit";
 
-
 // Props esperadas por el componente TradeForm
 type TradeFormProps = {
   mode: TradeFormMode;
@@ -134,7 +125,6 @@ type TradeFormProps = {
   saving?: boolean;
   onSubmit: (values: TradeFormValues) => Promise<void> | void;
 };
-
 
 // ===================== [TF6] Componente principal TradeForm =====================
 export default function TradeForm(props: TradeFormProps) {
@@ -147,45 +137,42 @@ export default function TradeForm(props: TradeFormProps) {
   const [patterns, setPatterns] = useState<Opt[]>([]);
   const [candles, setCandles] = useState<Opt[]>([]);
 
-// ---------- [TF6.2] Estado del formulario ----------
-const [form, setForm] = useState<TradeFormState>(() => ({
-  ticket: initialValues?.ticket ?? "",
-  session:
-    (initialValues?.session as TradeFormState["session"]) ??
-    ("London" as TradeFormState["session"]),
-  symbol: initialValues?.symbol ?? "",
-  timeframe: initialValues?.timeframe ?? "",
+  // ---------- [TF6.2] Estado del formulario ----------
+  const [form, setForm] = useState<TradeFormState>(() => ({
+    ticket: initialValues?.ticket ?? "",
+    session:
+      (initialValues?.session as TradeFormState["session"]) ??
+      ("London" as TradeFormState["session"]),
+    symbol: initialValues?.symbol ?? "",
+    timeframe: initialValues?.timeframe ?? "",
 
-  ea: initialValues?.ea ?? "",
-  patron: initialValues?.patron ?? "",
-  vela: initialValues?.vela ?? "",
-  tendencia: initialValues?.tendencia ?? "",
+    ea: initialValues?.ea ?? "",
+    patron: initialValues?.patron ?? "",
+    vela: initialValues?.vela ?? "",
+    tendencia: initialValues?.tendencia ?? "",
 
-  entry_price: initialValues?.entry_price ?? "",
-  exit_price: initialValues?.exit_price ?? "",
+    entry_price: initialValues?.entry_price ?? "",
+    exit_price: initialValues?.exit_price ?? "",
 
-  pips: initialValues?.pips ?? "",
-  rr_objetivo: initialValues?.rr_objetivo ?? "",
-  pnl_usd_gross: initialValues?.pnl_usd_gross ?? "",
-  volume: initialValues?.volume ?? "",
+    pips: initialValues?.pips ?? "",
+    rr_objetivo: initialValues?.rr_objetivo ?? "",
+    pnl_usd_gross: initialValues?.pnl_usd_gross ?? "",
+    volume: initialValues?.volume ?? "",
 
-  emocion: initialValues?.emocion ?? "",
-  side: initialValues?.side ?? "",
+    emocion: initialValues?.emocion ?? "",
+    side: initialValues?.side ?? "",
 
-  close_reason: initialValues?.close_reason ?? "",
+    close_reason: initialValues?.close_reason ?? "",
 
-  ea_signal: initialValues?.ea_signal ?? "",
-  ea_tp1: initialValues?.ea_tp1 ?? "",
-  ea_tp2: initialValues?.ea_tp2 ?? "",
-  ea_tp3: initialValues?.ea_tp3 ?? "",
-  ea_sl1: initialValues?.ea_sl1 ?? "",
-  ea_score: initialValues?.ea_score ?? "",
+    ea_signal: initialValues?.ea_signal ?? "",
+    ea_tp1: initialValues?.ea_tp1 ?? "",
+    ea_tp2: initialValues?.ea_tp2 ?? "",
+    ea_tp3: initialValues?.ea_tp3 ?? "",
+    ea_sl1: initialValues?.ea_sl1 ?? "",
+    ea_score: initialValues?.ea_score ?? "",
 
-  notas: initialValues?.notas ?? "",
-}));
-
-
-
+    notas: initialValues?.notas ?? "",
+  }));
 
   // ---------- [TF6.3] Sincronizar cuando cambien initialValues ----------
   useEffect(() => {
@@ -200,29 +187,28 @@ const [form, setForm] = useState<TradeFormState>(() => ({
     }));
   }, [initialValues]);
 
-// ---------- [TF6.4] Cargar catálogos al montar ----------
-useEffect(() => {
-  (async () => {
-    try {
-      const [sym, tfs, eaOpts, pat, vel] = await Promise.all([
-        loadOptions("symbol"),
-        loadOptions("timeframe"),
-        loadOptions("ea"),
-        loadOptions("pattern"), // <- patrones (field-edits tipo "pattern")
-        loadOptions("candle"),  // <- velas (field-edits tipo "candle")
-      ]);
+  // ---------- [TF6.4] Cargar catálogos al montar ----------
+  useEffect(() => {
+    (async () => {
+      try {
+        const [sym, tfs, eaOpts, pat, vel] = await Promise.all([
+          loadOptions("symbol"),
+          loadOptions("timeframe"),
+          loadOptions("ea"),
+          loadOptions("pattern"), // <- patrones (field-edits tipo "pattern")
+          loadOptions("candle"), // <- velas (field-edits tipo "candle")
+        ]);
 
-      setSymbols(sym);
-      setTimeframes(tfs);
-      setEas(eaOpts);
-      setPatterns(pat);
-      setCandles(vel);
-    } catch (e) {
-      console.error("Error cargando catálogos en TradeForm:", e);
-    }
-  })();
-}, []);
-
+        setSymbols(sym);
+        setTimeframes(tfs);
+        setEas(eaOpts);
+        setPatterns(pat);
+        setCandles(vel);
+      } catch (e) {
+        console.error("Error cargando catálogos en TradeForm:", e);
+      }
+    })();
+  }, []);
 
   // ---------- [TF6.5] Helper de cambio de campo ----------
   function onChange<K extends keyof TradeFormState>(field: K, value: TradeFormState[K]) {
@@ -342,8 +328,7 @@ useEffect(() => {
           </select>
         </div>
       </div>
-      
-      
+
       {/* Fila 3: Patrón | Vela | Tendencia */}
       <div className="grid-3">
         <div className="field">
@@ -395,8 +380,8 @@ useEffect(() => {
           </select>
         </div>
       </div>
-      
-            {/* Fila extra: Precio de Apertura | Precio de Cierre | (vacío) */}
+
+      {/* Fila extra: Precio de Apertura | Precio de Cierre | (vacío) */}
       <div className="grid-3">
         <div className="field">
           <label className="label">Precio de Apertura</label>
@@ -420,7 +405,9 @@ useEffect(() => {
           />
         </div>
 
-        <div className="field">{/* columna vacía para mantener 3 columnas */}</div>
+        <div className="field">
+          {/* columna vacía para mantener 3 columnas */}
+        </div>
       </div>
 
       {/* Fila 4: Pips | R objetivo | $P&L */}
@@ -509,8 +496,8 @@ useEffect(() => {
           />
         </div>
       </div>
-      
-            {/* Fila extra: Close Reason */}
+
+      {/* Fila extra: Close Reason */}
       <div className="grid-3">
         <div className="field">
           <label className="label">Close Reason (TP/SL/OTHER)</label>
@@ -530,59 +517,56 @@ useEffect(() => {
         <div className="field">{/* vacío para mantener 3 columnas */}</div>
       </div>
 
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-
-      {/* Fila 6: Bloque EA (Señal, TPs, SL, Score) */}
+      {/* Fila 6: Bloque EA (Señal EA | TP1 | TP2) */}
       <div className="grid-3">
-       <div className="field">
-  <label className="label">Señal EA (BUY/SELL)</label>
-  <select
-    className="select"
-    value={form.ea_signal}
-    onChange={(e) => onChange("ea_signal", e.target.value)}
-    disabled={disabled}
-  >
-    <option value="">— Selecciona —</option>
-    <option value="BUY">BUY</option>
-    <option value="SELL">SELL</option>
-  </select>
-</div>
-  
         <div className="field">
-          <label className="label">TP1 / TP2 / TP3</label>
-          <div className="grid-3 compact">
-            <input
-              className="input"
-              placeholder="TP1"
-              value={form.ea_tp1}
-              onChange={(e) => onChange("ea_tp1", e.target.value)}
-              disabled={disabled}
-            />
-            <input
-              className="input"
-              placeholder="TP2"
-              value={form.ea_tp2}
-              onChange={(e) => onChange("ea_tp2", e.target.value)}
-              disabled={disabled}
-            />
-            <input
-              className="input"
-              placeholder="TP3"
-              value={form.ea_tp3}
-              onChange={(e) => onChange("ea_tp3", e.target.value)}
-              disabled={disabled}
-            />
-          </div>
+          <label className="label">Señal EA (BUY/SELL)</label>
+          <select
+            className="select"
+            value={form.ea_signal}
+            onChange={(e) => onChange("ea_signal", e.target.value)}
+            disabled={disabled}
+          >
+            <option value="">— Selecciona —</option>
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+          </select>
+        </div>
+
+        <div className="field">
+          <label className="label">TP1</label>
+          <input
+            className="input"
+            placeholder="TP1"
+            value={form.ea_tp1}
+            onChange={(e) => onChange("ea_tp1", e.target.value)}
+            disabled={disabled}
+          />
+        </div>
+
+        <div className="field">
+          <label className="label">TP2</label>
+          <input
+            className="input"
+            placeholder="TP2"
+            value={form.ea_tp2}
+            onChange={(e) => onChange("ea_tp2", e.target.value)}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+
+      {/* Fila 7: TP3 | SL1 | Calificación */}
+      <div className="grid-3">
+        <div className="field">
+          <label className="label">TP3</label>
+          <input
+            className="input"
+            placeholder="TP3"
+            value={form.ea_tp3}
+            onChange={(e) => onChange("ea_tp3", e.target.value)}
+            disabled={disabled}
+          />
         </div>
 
         <div className="field">
@@ -595,10 +579,7 @@ useEffect(() => {
             disabled={disabled}
           />
         </div>
-      </div>
 
-      {/* Fila 7: Score de la señal */}
-      <div className="grid-3">
         <div className="field">
           <label className="label">Calificación (0–100)</label>
           <input
