@@ -1,7 +1,8 @@
 // ===================== [CAL-0] /calendar/page.tsx =====================
 // Vista de calendario anual Bitlog
-// - Muestra 12 meses en grid (P&L diario verde/rojo)
-// - Al hacer click en un mes, se ve calendario grande con detalle y total mensual
+// - 12 meses en grid (P&L diario verde/rojo)
+// - Calendario grande del mes seleccionado
+// - Nuevo: tercer bloque con tabla de trades del día seleccionado
 // ======================================================================
 
 "use client";
@@ -11,11 +12,19 @@ import TopNav from "@/components/TopNav";
 import { createClient } from "@supabase/supabase-js";
 
 // --------------------- [CAL-1] Tipos básicos ---------------------------
+// [CAL-1.1] Trade con campos extendidos (alineado con /trades/page.tsx)
 type Trade = {
   id: number;
   ticket: string;
   symbol: string | null;
+  side: "BUY" | "SELL" | null;
+  volume: number | null;
+  entry_price: number | null;
+  exit_price: number | null;
   dt_open_utc: string | null;
+  dt_close_utc: string | null;
+  ea: string | null;
+  session: string | null;
   pnl_usd_gross: number | null;
 };
 
@@ -42,7 +51,7 @@ const MONTH_NAMES = [
 
 const WEEK_LABELS = ["L", "M", "M", "J", "V", "S", "D"];
 
-// Formateador de fechas SOLO para clave de día local (America/Mazatlan)
+// [CAL-1.2] Formateador de fechas SOLO para clave de día local (America/Mazatlan)
 const fmtDateKey = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Mazatlan",
   year: "numeric",
@@ -50,26 +59,35 @@ const fmtDateKey = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
-// USD corto para celdas
+// [CAL-1.3] USD corto para celdas
 const fmtUSD = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   maximumFractionDigits: 2,
 });
 
-// Helper CSS
+// [CAL-1.4] Fecha legible para detalle (igual filosofía que /trades)
+const fmtDT = new Intl.DateTimeFormat("es-MX", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "America/Mazatlan",
+});
+
+const asDT = (s: string | null) => (s ? fmtDT.format(new Date(s)) : "");
+
+// [CAL-1.5] Helper CSS
 const cls = (...xs: (string | false | null | undefined)[]) =>
   xs.filter(Boolean).join(" ");
 
-// Convierte un dt_open_utc en clave "YYYY-MM-DD" en horario Mazatlán
+// [CAL-1.6] Convierte un dt_open_utc en clave "YYYY-MM-DD" en horario Mazatlán
 function dayKeyFromUtc(s: string | null): string | null {
   if (!s) return null;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
-  return fmtDateKey.format(d); // 2025-01-03
+  return fmtDateKey.format(d); // e.g. 2025-01-03
 }
 
-// Genera matriz de semanas para un mes (L a D, lunes como primer día)
+// [CAL-1.7] Genera matriz de semanas para un mes (L a D, lunes como primer día)
 function buildMonthMatrix(year: number, monthIdx0: number): (number | null)[][] {
   // monthIdx0: 0=Ene, 11=Dic
   const first = new Date(Date.UTC(year, monthIdx0, 1));
@@ -118,7 +136,12 @@ export default function CalendarPage() {
   const [loading, setLoading] = React.useState<boolean>(true);
   const [err, setErr] = React.useState<string | null>(null);
 
-  // [CAL-2.4] Carga inicial + cuando cambia el año
+  // [CAL-2.4] Día seleccionado en el calendario grande (YYYY-MM-DD)
+  const [selectedDayKey, setSelectedDayKey] = React.useState<string | null>(
+    null
+  );
+
+  // [CAL-2.5] Carga inicial + cuando cambia el año
   React.useEffect(() => {
     let cancelled = false;
 
@@ -143,10 +166,14 @@ export default function CalendarPage() {
 
         const { data, error } = await sb
           .from("trades")
-          .select("id,ticket,symbol,dt_open_utc,pnl_usd_gross")
+          .select(
+            // [CAL-2.5.1] Seleccionamos todos los campos necesarios para el detalle
+            "id,ticket,symbol,side,volume,entry_price,exit_price,dt_open_utc,dt_close_utc,ea,session,pnl_usd_gross"
+          )
           .gte("dt_open_utc", from.toISOString())
           .lt("dt_open_utc", to.toISOString())
-          .order("dt_open_utc", { ascending: true });
+          .order("dt_open_utc", { ascending: true })
+          .order("id", { ascending: true });
 
         if (error) {
           console.error("calendar loadYear error", error);
@@ -159,6 +186,8 @@ export default function CalendarPage() {
 
         if (!cancelled) {
           setTrades((data ?? []) as Trade[]);
+          // al cambiar de año, limpiamos selección de día
+          setSelectedDayKey(null);
         }
       } catch (e: any) {
         console.error("calendar loadYear exception", e);
@@ -180,7 +209,7 @@ export default function CalendarPage() {
     };
   }, [sb, year]);
 
-  // [CAL-2.5] Mapas derivados: resumen por día
+  // [CAL-2.6] Mapas derivados: resumen por día
   const dayMap = React.useMemo(() => {
     const map: Record<string, DaySummary> = {};
     for (const t of trades) {
@@ -196,13 +225,13 @@ export default function CalendarPage() {
     return map;
   }, [trades]);
 
-  // [CAL-2.6] Derivados específicos del mes seleccionado
+  // [CAL-2.7] Derivados específicos del mes seleccionado
   const monthPrefix = React.useMemo(
     () => `${year}-${String(selectedMonth + 1).padStart(2, "0")}-`,
     [year, selectedMonth]
   );
 
-  // a) Trades del mes agrupados por día
+  // [CAL-2.8.a] Trades del mes agrupados por día
   const tradesByDay = React.useMemo(() => {
     const res: Record<string, Trade[]> = {};
     for (const t of trades) {
@@ -214,7 +243,7 @@ export default function CalendarPage() {
     return res;
   }, [trades, monthPrefix]);
 
-  // b) Total P&L del mes (suma de dayMap)
+  // [CAL-2.8.b] Total P&L del mes (suma de dayMap)
   const monthTotal = React.useMemo(() => {
     let total = 0;
     for (const [key, s] of Object.entries(dayMap)) {
@@ -225,9 +254,35 @@ export default function CalendarPage() {
     return total;
   }, [dayMap, monthPrefix]);
 
+  // [CAL-2.8.c] Trades del día seleccionado (para el tercer bloque)
+  const selectedTrades = React.useMemo(
+    () => (selectedDayKey ? tradesByDay[selectedDayKey] ?? [] : []),
+    [selectedDayKey, tradesByDay]
+  );
+
   const monthName = MONTH_NAMES[selectedMonth];
 
-  // --------------------- [CAL-3] Render helpers -------------------------
+  // --------------------- [CAL-3] Handlers -------------------------------
+  // [CAL-3.1] Selección de mes desde la cuadricula de 12 meses
+  function handleSelectMonth(monthIdx0: number) {
+    setSelectedMonth(monthIdx0);
+    // limpiar selección de día cuando cambias de mes
+    setSelectedDayKey(null);
+  }
+
+  // [CAL-3.2] Selección de día desde el calendario grande
+  function handleSelectDay(key: string) {
+    const list = tradesByDay[key] ?? [];
+    if (!list.length) {
+      // si no hay trades ese día, limpiamos selección
+      setSelectedDayKey(null);
+      return;
+    }
+    setSelectedDayKey(key);
+  }
+
+  // --------------------- [CAL-4] Render helpers -------------------------
+  // [CAL-4.1] Mini calendario (cuadrícula de 12 meses)
   function renderMonthMini(monthIdx0: number) {
     const matrix = buildMonthMatrix(year, monthIdx0);
     const active = monthIdx0 === selectedMonth;
@@ -240,7 +295,7 @@ export default function CalendarPage() {
           "calendar-month-mini",
           active && "calendar-month-mini-active"
         )}
-        onClick={() => setSelectedMonth(monthIdx0)}
+        onClick={() => handleSelectMonth(monthIdx0)}
       >
         {/* Nombre del mes */}
         <div className="calendar-month-name">
@@ -316,6 +371,7 @@ export default function CalendarPage() {
     );
   }
 
+  // [CAL-4.2] Calendario grande del mes seleccionado
   function renderMonthBig() {
     const matrix = buildMonthMatrix(year, selectedMonth);
 
@@ -373,6 +429,8 @@ export default function CalendarPage() {
                       pos && "calendar-day-pos",
                       neg && "calendar-day-neg"
                     )}
+                    onClick={() => handleSelectDay(key)}
+                    style={{ cursor: has ? "pointer" : "default" }}
                   >
                     {/* Número de día */}
                     <div className="calendar-day-number-big">
@@ -392,7 +450,7 @@ export default function CalendarPage() {
                       </div>
                     )}
 
-                    {/* Lista de trades del día */}
+                    {/* Lista compacta de trades del día */}
                     {trades.length > 0 && (
                       <div className="calendar-day-trades-list">
                         {trades.map((t) => {
@@ -430,7 +488,7 @@ export default function CalendarPage() {
     );
   }
 
-  // --------------------- [CAL-4] Render principal ----------------------
+  // --------------------- [CAL-5] Render principal ----------------------
   return (
     <>
       <TopNav />
@@ -438,11 +496,13 @@ export default function CalendarPage() {
       <main className="container">
         <h1 className="title">Calendar</h1>
         <p className="sub">
-          Vista rápida de días verdes/rojos por año. Haz click en un mes para ver el detalle.
+          Vista rápida de días verdes/rojos por año. Haz click en un mes para ver el detalle
+          y luego en un día para ver todos los trades de ese día.
         </p>
 
         {err && <div className="err">{err}</div>}
 
+        {/* Barra de año */}
         <div className="calendar-year-bar">
           <button
             type="button"
@@ -463,14 +523,98 @@ export default function CalendarPage() {
 
         {loading && <div>Cargando calendario...</div>}
 
-        {/* Grid con los 12 meses */}
+        {/* [Bloque 1] Grid con los 12 meses */}
         <div className="calendar-grid-year">
           {Array.from({ length: 12 }).map((_, idx) => renderMonthMini(idx))}
         </div>
 
-        {/* Detalle del mes seleccionado */}
+        {/* [Bloque 2] Detalle del mes seleccionado */}
         <section className="calendar-month-detail">
           {renderMonthBig()}
+        </section>
+
+        {/* [Bloque 3] Detalle de trades del día seleccionado */}
+        <section className="calendar-day-detail">
+          <h2 className="calendar-day-detail-title">
+            Trades del día seleccionado
+          </h2>
+
+          {!selectedDayKey && (
+            <p className="calendar-day-detail-empty">
+              Haz click en un día con trades en el calendario para ver el detalle aquí.
+            </p>
+          )}
+
+          {selectedDayKey && (
+            <>
+              <p className="calendar-day-detail-date">
+                Día: <strong>{selectedDayKey}</strong> ·{" "}
+                {selectedTrades.length} trade
+                {selectedTrades.length === 1 ? "" : "s"}
+              </p>
+
+              {selectedTrades.length === 0 && (
+                <p className="calendar-day-detail-empty">
+                  No hay trades registrados para este día.
+                </p>
+              )}
+
+              {selectedTrades.length > 0 && (
+                <div className="card" style={{ marginTop: 8 }}>
+                  <div className="table-wrap">
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Ticket</th>
+                          <th>Símbolo</th>
+                          <th>Lado</th>
+                          <th>Vol</th>
+                          <th>Entry</th>
+                          <th>Exit</th>
+                          <th>Open (UTC-7)</th>
+                          <th>Close (UTC-7)</th>
+                          <th>$P&amp;L</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedTrades.map((t) => {
+                          const pnl = t.pnl_usd_gross ?? 0;
+                          const pnlPos = pnl >= 0;
+                          return (
+                            <tr key={t.id}>
+                              <td>
+                                <a href={`/trades/${t.id}`} className="link">
+                                  {t.ticket}
+                                </a>
+                              </td>
+                              <td>{t.symbol}</td>
+                              <td>{t.side}</td>
+                              <td className="num">
+                                {t.volume == null ? "" : t.volume}
+                              </td>
+                              <td className="num">
+                                {t.entry_price == null ? "" : t.entry_price}
+                              </td>
+                              <td className="num">
+                                {t.exit_price == null ? "" : t.exit_price}
+                              </td>
+                              <td>{asDT(t.dt_open_utc)}</td>
+                              <td>{asDT(t.dt_close_utc)}</td>
+                              <td className={pnlPos ? "pnl-pos num" : "pnl-neg num"}>
+                                {t.pnl_usd_gross == null
+                                  ? ""
+                                  : fmtUSD.format(t.pnl_usd_gross)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </section>
       </main>
     </>
