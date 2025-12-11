@@ -75,7 +75,7 @@ export default function TopNav() {
             marginRight: 8,
           }}
         >
-          Bitlog 2.0
+
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
