@@ -20,12 +20,12 @@ const NAV_LINKS: NavLink[] = [
   { href: "/", label: "Home" },
   { href: "/trades", label: "Trades" },
   { href: "/trades/new", label: "New" },
-  { href: "/field-edits", label: "Field Edits" },
+  { href: "/field-edits", label: "F. Edits" },
   { href: "/import", label: "Import" },
   { href: "/charts", label: "Charts" },
-  { href: "/checklist", label: "Checklist" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/fundamental", label: "Fundamental", isFundamental: true },
+  { href: "/checklist", label: "Chklist" },
+  { href: "/calendar", label: "Cal" },
+  { href: "/fundamental", label: "News", isFundamental: true },
 ];
 
 export default function TopNav() {
@@ -131,36 +131,7 @@ export default function TopNav() {
         </div>
       </div>
 
-      {/* Lado derecho: buscador de ticket */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <form
-          onSubmit={goSearch}
-          style={{ display: "flex", alignItems: "center", gap: 4 }}
-        >
-          <input
-            value={ticket}
-            onChange={(e) => setTicket(e.target.value)}
-            placeholder="Buscar ticket..."
-            style={{
-              height: 30,
-              padding: "0 10px",
-              borderRadius: 4,
-              border: "1px solid #374151",
-              background: "#020617",
-              color: "#e5e7eb",
-              fontSize: 12,
-              minWidth: 140,
-            }}
-          />
-          <button
-            className="btn-nav"
-            type="submit"
-            style={{ height: 30, padding: "0 10px" }}
-          >
-            🔍
-          </button>
-        </form>
-      </div>
+     
     </nav>
   );
 }
