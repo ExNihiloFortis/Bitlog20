@@ -25,6 +25,7 @@ const NAV_LINKS: NavLink[] = [
   { href: "/charts", label: "Charts" },
   { href: "/checklist", label: "Chklist" },
   { href: "/calendar", label: "Cal" },
+    { href: "/journal", label: "Jrnl" },
   { href: "/fundamental", label: "News", isFundamental: true },
 ];
 
