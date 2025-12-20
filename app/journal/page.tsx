@@ -9,6 +9,7 @@ type JournalEntry = {
   id: string;
   entry_date: string; // YYYY-MM-DD (date)
   content: string;
+  priority: number; // 0..3 (tratamos 0 como 1)
   created_at: string | null;
   updated_at: string | null;
 };
@@ -25,7 +26,6 @@ const MONTH_NAMES = [
 
 const WEEK_LABELS = ["L", "M", "M", "J", "V", "S", "D"];
 
-
 // YYYY-MM-DD en America/Mazatlan
 const fmtDateKey = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Mazatlan",
@@ -40,6 +40,21 @@ const fmtTimeLocal = new Intl.DateTimeFormat("es-MX", {
   minute: "2-digit",
   hour12: true,
 });
+
+const MONTH_ABBR_ES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+function fmtKey_DD_Mmm_YYYY(key: string | null | undefined): string {
+  if (!key) return "";
+  // key esperado: YYYY-MM-DD
+  const [y, m, d] = key.split("-").map((x) => parseInt(x, 10));
+  if (!y || !m || !d) return String(key);
+
+  const dd = String(d).padStart(2, "0");
+  const mon = MONTH_ABBR_ES[m - 1] ?? "???";
+  return `${dd}-${mon}-${y}`;
+}
+
+
 
 function fmtHHMM_UTC7(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -84,6 +99,8 @@ export default function JournalPage() {
     )
   );
 
+  const [priority, setPriority] = React.useState<number>(1);
+
   const now = new Date();
   const [year, setYear] = React.useState<number>(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = React.useState<number>(now.getMonth());
@@ -93,10 +110,38 @@ export default function JournalPage() {
   const [err, setErr] = React.useState<string | null>(null);
 
   const [selectedDayKey, setSelectedDayKey] = React.useState<string | null>(null);
+  
+  
+  const didInitRef = React.useRef(false);
+  React.useEffect(() => {
+  if (didInitRef.current) return;
+  didInitRef.current = true;
+
+  const k = todayKeyLocal(); // YYYY-MM-DD en America/Mazatlan
+  setSelectedDayKey(k);
+}, []);
 
   const [draft, setDraft] = React.useState<string>("");
   const [saving, setSaving] = React.useState<boolean>(false);
   const [saveMsg, setSaveMsg] = React.useState<string | null>(null);
+  
+  // ===================== [JRN-SRCH-1] Search state =====================
+const [qText, setQText] = React.useState<string>("");
+const [qFrom, setQFrom] = React.useState<string>(""); // YYYY-MM-DD
+const [qTo, setQTo] = React.useState<string>("");   // YYYY-MM-DD
+const [searching, setSearching] = React.useState<boolean>(false);
+const [searchErr, setSearchErr] = React.useState<string | null>(null);
+const [searchResults, setSearchResults] = React.useState<JournalEntry[]>([]);
+
+    
+  
+    // ===================== [JRN-DOT] Color por prioridad =====================
+  function dotClass(p?: number) {
+    const v = typeof p === "number" ? (p === 0 ? 1 : p) : 1;
+    if (v === 3) return "jrn-dot jrn-dot-red";
+    if (v === 2) return "jrn-dot jrn-dot-yellow";
+    return "jrn-dot jrn-dot-green";
+  }
 
   // --------------------- [JRN-2.1] Load year ---------------------
   React.useEffect(() => {
@@ -122,7 +167,8 @@ export default function JournalPage() {
 
         const { data, error } = await sb
           .from("journal_entries")
-          .select("id,entry_date,content,created_at,updated_at")
+          .select("id,entry_date,content,priority,created_at,updated_at")
+
           .gte("entry_date", from)
           .lte("entry_date", to)
           .order("entry_date", { ascending: true })
@@ -185,10 +231,14 @@ export default function JournalPage() {
   );
 
   // Cuando seleccionas día, carga draft
-  React.useEffect(() => {
-    if (!selectedDayKey) return;
-    setDraft(entriesByDay[selectedDayKey]?.content ?? "");
-  }, [selectedDayKey, entriesByDay]);
+ React.useEffect(() => {
+  if (!selectedDayKey) return;
+  const e = entriesByDay[selectedDayKey];
+  setDraft(e?.content ?? "");
+  // 0 -> 1 (verde)
+  setPriority(typeof e?.priority === "number" ? (e.priority === 0 ? 1 : e.priority) : 1);
+}, [selectedDayKey, entriesByDay]);
+
 
   // --------------------- [JRN-3] Actions ---------------------
   function handleSelectMonth(monthIdx0: number) {
@@ -204,10 +254,68 @@ export default function JournalPage() {
     setSaveMsg(null);
   }
 
+// ===================== [JRN-SRCH-2] Search action =====================
+async function runSearch() {
+  setSearching(true);
+  setSearchErr(null);
+
+  try {
+    const ses = await sb.auth.getSession();
+    const me = ses.data.session?.user ?? null;
+    if (!me) {
+      setSearchErr("No hay sesión. Entra a /login");
+      setSearchResults([]);
+      return;
+    }
+
+    let query = sb
+      .from("journal_entries")
+      .select("id,entry_date,content,priority,created_at,updated_at")
+      .order("entry_date", { ascending: false })
+      .order("id", { ascending: false });
+
+    // Rango de fechas (opcional)
+    if (qFrom.trim()) query = query.gte("entry_date", qFrom.trim());
+    if (qTo.trim()) query = query.lte("entry_date", qTo.trim());
+
+    // Texto (opcional) - ilike
+    const needle = qText.trim();
+    if (needle) query = query.ilike("content", `%${needle}%`);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("journal search error", error);
+      setSearchErr(error.message);
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchResults((data ?? []) as JournalEntry[]);
+  } catch (e: any) {
+    console.error("journal search exception", e);
+    setSearchErr(String(e));
+    setSearchResults([]);
+  } finally {
+    setSearching(false);
+  }
+}
+
+function clearSearch() {
+  setQText("");
+  setQFrom("");
+  setQTo("");
+  setSearchErr(null);
+  setSearchResults([]);
+}
+
+
   async function handleSaveForDay(key: string) {
     setSaving(true);
     setSaveMsg(null);
     setErr(null);
+    
+
 
     try {
       const ses = await sb.auth.getSession();
@@ -224,18 +332,19 @@ export default function JournalPage() {
       }
 
       const { data, error } = await sb
-        .from("journal_entries")
-        .upsert(
-          {
-            user_id: me.id,
-            entry_date: key,
-            content,
-            updated_at: new Date().toISOString(),
-          } as any,
-          { onConflict: "user_id,entry_date" }
-        )
-        .select("id,entry_date,content,created_at,updated_at")
-        .single();
+  .from("journal_entries")
+  .upsert(
+    {
+      user_id: me.id,
+      entry_date: key,
+      content,
+      priority, // ✅
+      updated_at: new Date().toISOString(),
+    } as any,
+    { onConflict: "user_id,entry_date" }
+  )
+  .select("id,entry_date,content,priority,created_at,updated_at")
+  .single();
 
       if (error) {
         console.error("journal upsert error", error);
@@ -338,7 +447,8 @@ export default function JournalPage() {
                     title={has ? "Hay nota" : ""}
                   >
                     <div className="calendar-day-number-mini">{day}</div>
-                    {has && <div className="jrn-dot" />}
+                    {has && <div className={dotClass(entriesByDay[key]?.priority)} />}
+
                   </div>
                 );
               })}
@@ -349,71 +459,89 @@ export default function JournalPage() {
     );
   }
 
-  function renderMonthBig() {
-    const matrix = buildMonthMatrix(year, selectedMonth);
-    const monthName = MONTH_NAMES[selectedMonth];
+ function renderMonthBig() {
+  const matrix = buildMonthMatrix(year, selectedMonth);
+  const monthName = MONTH_NAMES[selectedMonth];
 
-    return (
-      <div className="calendar-month-big">
-        <div className="calendar-month-detail-title">
-          {monthName} {year}
-        </div>
+  return (
+    <div className="calendar-month-big">
+      <div className="calendar-month-detail-title">
+        {monthName} {year}
+      </div>
 
-        <div className="calendar-week-header calendar-week-header-big">
-          {WEEK_LABELS.map((w, i) => (
-            <div key={`${w}-${i}`} className="calendar-week-cell">
-              {w}
-            </div>
-          ))}
-        </div>
+      <div className="calendar-week-header calendar-week-header-big">
+        {WEEK_LABELS.map((w, i) => (
+          <div key={`${w}-${i}`} className="calendar-week-cell">
+            {w}
+          </div>
+        ))}
+      </div>
 
-        <div className="calendar-weeks calendar-weeks-big">
-          {matrix.map((week, i) => (
-            <div key={i} className="calendar-week-row calendar-week-row-big">
-              {week.map((day, idx) => {
-                if (!day) return <div key={idx} className={cls("calendar-day-cell", "calendar-day-empty")} />;
-                const key = `${year}-${String(selectedMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                const has = !!dayMap[key];
-                const isSel = selectedDayKey === key;
-
+      <div className="calendar-weeks calendar-weeks-big">
+        {matrix.map((week, i) => (
+          <div key={i} className="calendar-week-row calendar-week-row-big">
+            {week.map((day, idx) => {
+              if (!day)
                 return (
                   <div
                     key={idx}
-                    className={cls(
-                      "calendar-day-cell",
-                      "calendar-day-cell-big",
-                      has && "calendar-day-has-trades",
-                      isSel && "calendar-day-selected"
-                    )}
-                    onClick={() => handleSelectDay(key)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <div className="calendar-day-number-big">{day}</div>
-                    {has && <div className="jrn-dot" />}
-                  </div>
+                    className={cls("calendar-day-cell", "calendar-day-empty")}
+                  />
                 );
-              })}
-            </div>
-          ))}
-        </div>
 
-        <div className="calendar-month-footer">
-          <span>Días con nota en el mes:&nbsp;</span>
-          <span className="pnl-pos">{Object.keys(dayMap).filter((k) => k.startsWith(monthPrefix)).length}</span>
-        </div>
+              const key = `${year}-${String(selectedMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+              const has = !!dayMap[key];
+              const isSel = selectedDayKey === key;
+              const isToday = key === todayKey;
+
+              return (
+                <div
+                  key={idx}
+                  className={cls(
+                    "calendar-day-cell",
+                    "calendar-day-cell-big",
+                    has && "calendar-day-has-trades",
+                    isSel && "calendar-day-selected",
+                    isToday && "calendar-day-today"
+                  )}
+                  onClick={() => handleSelectDay(key)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="calendar-day-number-big">{day}</div>
+                    {has && <div className={dotClass(entriesByDay[key]?.priority)} />}
+
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
-    );
-  }
+
+      <div className="calendar-month-footer">
+        <span>Días con nota en el mes:&nbsp;</span>
+        <span className="pnl-pos">
+          {Object.keys(dayMap).filter((k) => k.startsWith(monthPrefix)).length}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 
   // --------------------- [JRN-5] Main render ---------------------
-  const effectiveKey = selectedDayKey ?? todayKeyLocal();
-  const hasSelected = !!entriesByDay[effectiveKey];
   
-  const entryForKey = entriesByDay[effectiveKey];
+    const todayKey = todayKeyLocal();
+    const effectiveKey = selectedDayKey ?? todayKeyLocal();
+    const hasSelected = !!entriesByDay[effectiveKey];
+    const entryForKey = entriesByDay[effectiveKey];
 
   const timeLabel =
     fmtHHMM_UTC7(entryForKey?.updated_at) ??
     fmtHHMM_UTC7(entryForKey?.created_at);
+   const selectedEntry = selectedDayKey ? entriesByDay[selectedDayKey] : null;
+   const selectedTimeLabel =
+  fmtHHMM_UTC7(selectedEntry?.updated_at) ??
+  fmtHHMM_UTC7(selectedEntry?.created_at);
 
 
   return (
@@ -432,9 +560,9 @@ export default function JournalPage() {
             <div style={{ minWidth: 240 }}>
               <div style={{ fontWeight: 800 }}>Entrada del día</div>
               
-              
               <div className="muted" style={{ marginTop: 2 }}>
-  Día objetivo: <span style={{ fontFamily: "monospace" }}>{effectiveKey}</span>
+Día objetivo: <span style={{ fontFamily: "monospace" }}>{fmtKey_DD_Mmm_YYYY(effectiveKey)}</span>
+
   {timeLabel ? (
     <> / <span style={{ fontFamily: "monospace" }}>{timeLabel}</span></>
   ) : (
@@ -442,16 +570,22 @@ export default function JournalPage() {
   )}
 </div>
 
-              
-              
-              
-              
-            </div>
+              </div>
 
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <button type="button" className="btn" onClick={() => handleSaveForDay(effectiveKey)} disabled={saving}>
                 {saving ? "Guardando..." : "Guardar"}
               </button>
+              <select
+  className="input"
+  style={{ width: 220 }}
+  value={priority}
+  onChange={(e) => setPriority(parseInt(e.target.value, 10))}
+>
+  <option value={1}>🟢 Normal</option>
+  <option value={2}>🟡 Importante</option>
+  <option value={3}>🔴 Muy importante</option>
+</select>
 
               <button
                 type="button"
@@ -475,6 +609,113 @@ export default function JournalPage() {
 
           {saveMsg && <div className="ok" style={{ marginTop: 8 }}>{saveMsg}</div>}
         </section>
+        
+        
+        {/* ===================== [JRN-SRCH-3] Search UI ===================== */}
+<section className="card" style={{ padding: 14, marginBottom: 14 }}>
+  <div style={{ fontWeight: 800, marginBottom: 10 }}>Buscar en Journal</div>
+
+  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <div className="muted">Desde</div>
+      <input className="input" style={{ width: 160 }} type="date" value={qFrom} onChange={(e) => setQFrom(e.target.value)} />
+    </div>
+
+    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <div className="muted">Hasta</div>
+      <input className="input" style={{ width: 160 }} type="date" value={qTo} onChange={(e) => setQTo(e.target.value)} />
+    </div>
+
+    <input
+      className="input"
+      style={{ flex: 1, minWidth: 260 }}
+      placeholder='Contiene (ej. "tilt", "FOMO", "EMA", "disciplina")'
+      value={qText}
+      onChange={(e) => setQText(e.target.value)}
+    />
+
+    <button type="button" className="btn" onClick={runSearch} disabled={searching}>
+      {searching ? "Buscando..." : "Buscar"}
+    </button>
+
+    <button type="button" className="btn secondary" onClick={clearSearch} disabled={searching}>
+      Limpiar
+    </button>
+  </div>
+
+  {searchErr && <div className="err" style={{ marginTop: 10 }}>{searchErr}</div>}
+
+  {/* Results */}
+  <div style={{ marginTop: 12 }}>
+    <div className="muted" style={{ marginBottom: 8 }}>
+      Resultados: <strong>{searchResults.length}</strong>
+    </div>
+
+    {searchResults.length === 0 ? (
+      <div className="muted">Sin resultados (aún).</div>
+    ) : (
+      <div className="zebra" style={{ borderRadius: 12, overflow: "hidden" }}>
+        {searchResults.map((r) => {
+          const t =
+            fmtHHMM_UTC7(r.updated_at) ??
+            fmtHHMM_UTC7(r.created_at) ??
+            "--:-- UTC-7";
+
+          const pri = (r.priority === 0 ? 1 : r.priority);
+          const priLabel = pri === 3 ? "🔴" : pri === 2 ? "🟡" : "🟢";
+
+          const preview = (r.content ?? "").replace(/\s+/g, " ").trim().slice(0, 140);
+
+          return (
+            <div
+              key={r.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "160px 120px 60px 1fr 90px",
+                gap: 10,
+                padding: "10px 12px",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ fontFamily: "monospace" }}>{fmtKey_DD_Mmm_YYYY(r.entry_date)}</div>
+              <div style={{ fontFamily: "monospace" }}>{t}</div>
+              <div style={{ fontSize: 18 }}>{priLabel}</div>
+              <div className="muted">{preview}{preview.length >= 140 ? "…" : ""}</div>
+
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => {
+                  // Selecciona ese día en el calendario y muestra la nota abajo
+                  setSelectedDayKey(r.entry_date);
+                  setSelectedMonth(parseInt(r.entry_date.slice(5, 7), 10) - 1);
+
+                  // opcional: scroll suave al bloque 3
+                  setTimeout(() => {
+                    const el = document.querySelector(".calendar-day-detail");
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }, 50);
+                }}
+              >
+                Ver
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+</section>
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
         <div className="calendar-year-bar">
           <button type="button" className="calendar-year-btn" onClick={() => setYear((y) => y - 1)}>◀</button>
@@ -498,13 +739,28 @@ export default function JournalPage() {
 
           {selectedDayKey && (
             <div className="card" style={{ padding: 14, marginTop: 8 }}>
-            
+          
+          
+            <div className="muted" style={{ marginTop: 6 }}>
+  Prioridad:{" "}
+  <strong>
+    {(() => {
+      const p = entriesByDay[selectedDayKey]?.priority ?? 1;
+      const v = p === 0 ? 1 : p;
+      if (v === 3) return "🔴 Muy importante";
+      if (v === 2) return "🟡 Importante";
+      return "🟢 Normal";
+    })()}
+  </strong>
+</div>
+
             
             
             
             
            <div className="muted" style={{ marginBottom: 8 }}>
-  Día: <strong>{selectedDayKey}</strong>
+Día: <strong>{fmtKey_DD_Mmm_YYYY(selectedDayKey)}</strong>
+
   {timeLabel ? (
     <> / <strong>{timeLabel}</strong></>
   ) : (
@@ -542,10 +798,19 @@ export default function JournalPage() {
           margin-top: 4px;
           box-shadow: 0 0 0 1px rgba(0,0,0,.25);
         }
+        .jrn-dot-green{ background: #31d07b; }
+.jrn-dot-yellow{ background: #f5c84c; }
+.jrn-dot-red{ background: #ff4d4d; }
+        
+        
         .calendar-day-selected{
           outline: 2px solid rgba(245,200,76,.65);
           outline-offset: -2px;
         }
+        .calendar-day-today{
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.85);
+}
+
       `}</style>
     </>
   );

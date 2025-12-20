@@ -84,7 +84,7 @@ export default function FundamentalPage() {
           <h1 className="title">Análisis Fundamental — Noticias (Fase 1)</h1>
           <p className="sub">
             Módulo en tiempo real sin IA: solo lectura de noticias. Más adelante
-            aquí añadiremos resúmenes y Masterclass con IA para Bitlog 2.0.
+            aquí añadiremos resúmenes y Masterclass con IA para Bitlog 3.5.
           </p>
 
           {/* Barra de búsqueda */}

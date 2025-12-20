@@ -1,7 +1,5 @@
 // ===================== /components/TopNav.tsx =====================
 // Barra superior unificada (BitLog)
-// - Home, Trades, New, Field Edits, Import, Charts, Fundamental, Buscar ticket
-// - Usa .btn-nav (rectangular) y valida ticket por regex.
 // ================================================================
 
 "use client";
@@ -20,12 +18,12 @@ const NAV_LINKS: NavLink[] = [
   { href: "/", label: "Home" },
   { href: "/trades", label: "Trades" },
   { href: "/trades/new", label: "New" },
-  { href: "/field-edits", label: "F. Edits" },
+  { href: "/field-edits", label: "F.Edits" },
   { href: "/import", label: "Import" },
-  { href: "/charts", label: "Charts" },
   { href: "/checklist", label: "Chklist" },
   { href: "/calendar", label: "Cal" },
-    { href: "/journal", label: "Jrnl" },
+  { href: "/journal", label: "Jrnl" },
+  { href: "/charts", label: "Charts" },
   { href: "/fundamental", label: "News", isFundamental: true },
 ];
 
@@ -48,43 +46,42 @@ export default function TopNav() {
   }
 
   const isActive = (href: string) => {
-    if (href === "/") {
-      return pathname === "/";
-    }
+    if (href === "/") return pathname === "/";
     return pathname?.startsWith(href);
   };
 
   return (
     <nav
       style={{
-        borderBottom: "1px solid #111827",
+        width: "100%",
         background: "#020617",
-        padding: "10px 16px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 16,
+        borderBottom: "1px solid #111827",
+        padding: "10px 0",
       }}
     >
-      {/* Lado izquierdo: logo + links */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      {/* Wrapper centrado */}
+      <div
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          padding: "0 16px",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        {/* Menú */}
         <div
           style={{
-            fontWeight: 800,
-            fontSize: 18,
-            letterSpacing: 0.5,
-            marginRight: 8,
+            display: "flex",
+            gap: 8,
+            flexWrap: "nowrap",
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
           }}
         >
-
-        </div>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {NAV_LINKS.map((link) => {
             const active = isActive(link.href);
 
-            // Estilo base igual que otros .btn-nav
-            const baseClass = "btn-nav";
             const baseStyle: React.CSSProperties = {
               padding: "6px 12px",
               fontSize: 13,
@@ -93,21 +90,21 @@ export default function TopNav() {
               alignItems: "center",
               justifyContent: "center",
               borderRadius: 0,
+              border: "1px solid transparent",
+              whiteSpace: "nowrap",
             };
 
-            // Normal (azul) o Fundamental (rojo cereza #da3c3c)
             let style: React.CSSProperties = { ...baseStyle };
+
             if (link.isFundamental) {
-              // Botón FUNDAMENTAL siempre rojo cereza
               style = {
                 ...style,
-                backgroundColor: active ? "#da3c3c" : "#da3c3c",
+                backgroundColor: "#da3c3c",
                 borderColor: "#da3c3c",
                 color: "#ffffff",
                 fontWeight: 600,
               };
             } else if (active) {
-              // Activo normal (azul)
               style = {
                 ...style,
                 backgroundColor: "#1d4ed8",
@@ -120,7 +117,7 @@ export default function TopNav() {
             return (
               <button
                 key={link.href}
-                className={baseClass}
+                className="btn-nav"
                 style={style}
                 onClick={() => router.push(link.href)}
                 type="button"
@@ -131,8 +128,6 @@ export default function TopNav() {
           })}
         </div>
       </div>
-
-     
     </nav>
   );
 }
