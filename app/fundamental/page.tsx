@@ -81,10 +81,10 @@ export default function FundamentalPage() {
 
       <main className="container" style={{ paddingTop: 24 }}>
         <div className="card" style={{ padding: 20 }}>
-          <h1 className="title">Análisis Fundamental — Noticias (Fase 1)</h1>
+          <h1 className="title">Análisis Fundamental — Noticias</h1>
           <p className="sub">
             Módulo en tiempo real sin IA: solo lectura de noticias. Más adelante
-            aquí añadiremos resúmenes y Masterclass con IA para Bitlog 3.5.
+            aquí añadiremos resúmenes y Masterclass con IA para Bitlog 3.0.
           </p>
 
           {/* Barra de búsqueda */}
