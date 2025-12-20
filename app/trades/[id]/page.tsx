@@ -259,9 +259,20 @@ export default function TradeShowPage() {
         {/* NOTAS */}
         <div style={{ marginTop: 16 }}>
           <label className="label">Notas</label>
-          <div className="textarea" style={{ minHeight: 80 }}>
+          
+          
+          <div
+             className="textarea"
+            style={{ minHeight: 80, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+>
             {t.notes || "—"}
-          </div>
+        </div>
+
+          
+          
+          
+          
+          
         </div>
 
         {/* IMÁGENES */}
