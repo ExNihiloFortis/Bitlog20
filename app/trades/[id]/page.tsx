@@ -17,24 +17,41 @@ function displayCloseReason(raw: string | null | undefined) {
   return raw;
 }
 
+
+
+
 function Field({
   label,
   value,
   strong = false,
+  tone,
 }: {
   label: string;
   value: any;
   strong?: boolean;
+  tone?: "pos" | "neg" | "neutral";
 }) {
   return (
     <div className="field">
       <div className="label">{label}</div>
-      <div className="value" style={strong ? { fontWeight: 600 } : undefined}>
+      <div
+        className={`value ${
+          strong ? "value-strong" : ""
+        } ${
+          tone === "pos"
+            ? "value-pos"
+            : tone === "neg"
+            ? "value-neg"
+            : ""
+        }`}
+      >
         {value ?? "—"}
       </div>
     </div>
   );
 }
+
+
 
 function fmtNum(n: any) {
   if (n === null || n === undefined || n === "") return "—";
@@ -224,7 +241,21 @@ export default function TradeShowPage() {
             <Field label="Precio de Apertura" value={fmtNum(t.entry_price)} />
             <Field label="Precio de Cierre" value={fmtNum(t.exit_price)} />
             <Field label="Volumen" value={fmtNum(t.volume)} />
-            <Field label="$P&L" value={fmtNum(t.pnl_usd_gross)} strong />
+            
+          <Field
+  label="$P&L"
+  value={fmtNum(t.pnl_usd_gross)}
+  strong
+  tone={
+    Number(t?.pnl_usd_gross ?? 0) > 0
+      ? "pos"
+      : Number(t?.pnl_usd_gross ?? 0) < 0
+      ? "neg"
+      : "neutral"
+  }
+/>
+
+            
             <Field label="Patrón" value={t.patron} />
             <Field label="Vela" value={t.vela} />
             <Field label="Pips" value={fmtNum(t.pips)} />

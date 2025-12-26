@@ -14,6 +14,8 @@ import { createClient } from "@supabase/supabase-js";
 import TopNav from "@/components/TopNav";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";  // 👈 AÑADE ESTA LÍNEA
+import { flushSync } from "react-dom";
+
 
 // ...resto de tus imports que ya tengas...
 
@@ -64,7 +66,43 @@ const cls = (...xs: (string | false | null | undefined)[]) =>
 const asDT = (s: string | null) => (s ? fmtDT.format(new Date(s)) : "");
 
 
+function addDaysYYYYMMDD(d: string, days: number) {
+  const [y, m, dd] = d.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, dd + days, 0, 0, 0));
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const ddd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${ddd}`;
+}
 
+// Rango [fromInclusive, toExclusive) en UTC ISO
+function mazatlanRangeToUtc(fromYYYYMMDD: string, toYYYYMMDD: string) {
+  const fromUtc = `${fromYYYYMMDD}T07:00:00.000Z`;
+  const toNext = addDaysYYYYMMDD(toYYYYMMDD, 1);
+  const toUtcExclusive = `${toNext}T07:00:00.000Z`;
+  return { fromUtc, toUtcExclusive };
+}
+
+
+
+
+
+function addDays(dateStr: string, delta: number) {
+  const [y, m, d] = dateStr.split("-").map((n) => parseInt(n, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function mazatlanDayRangeUtc(dateStr: string) {
+  // 00:00 Mazatlán == 07:00Z
+  const from = `${dateStr}T07:00:00.000Z`;
+  const to = `${addDays(dateStr, 1)}T07:00:00.000Z`;
+  return { from, to };
+}
 
 
 export default function TradesPage() {
@@ -82,7 +120,11 @@ export default function TradesPage() {
   // ---------- Estados de búsqueda/paginación ----------
   const [qTicket, setQTicket] = React.useState<string>("");
   const [qId, setQId] = React.useState<string>(""); // Bitlog ID
+  
+  const [filterDateDraft, setFilterDateDraft] = React.useState<string>("");
+  const [filterDate, setFilterDate] = React.useState<string>("");
 
+  
   const [total, setTotal] = React.useState<number>(0);
   const [pageIdx, setPageIdx] = React.useState<number>(1);
   const [totalPages, setTotalPages] = React.useState<number>(1);
@@ -96,6 +138,12 @@ export default function TradesPage() {
   const [eas, setEas] = React.useState<string[]>([]);
   const [sessions, setSessions] = React.useState<string[]>([]);
   const [fSymbol, setFSymbol] = React.useState<string>("");
+  
+  const [fDateFrom, setFDateFrom] = React.useState<string>(""); // YYYY-MM-DD
+  const [fDateTo, setFDateTo]     = React.useState<string>(""); // YYYY-MM-DD
+
+ 
+  
   const [fEA, setFEA] = React.useState<string>("");
   const [fSession, setFSession] = React.useState<string>("");
 
@@ -138,12 +186,16 @@ export default function TradesPage() {
           sb.from("trades").select("symbol").not("symbol", "is", null),
           sb.from("trades").select("ea").not("ea", "is", null),
           sb.from("trades").select("session").not("session", "is", null),
+
         ]);
         const uniq = (xs: any[] | null | undefined, k: string) =>
           Array.from(new Set((xs ?? []).map((x: any) => x[k]))).filter(Boolean).sort();
         setSymbols(uniq(sym, "symbol"));
         setEas(uniq(ea, "ea"));
-        setSessions(uniq(sesh, "session"));
+
+
+setSessions(uniq(sesh, "session"));
+
 
         // primera carga con filtros iniciales
         await applyFilters();
@@ -157,36 +209,77 @@ export default function TradesPage() {
   }, []);
 
   // ---------- Helpers de filtros comunes ----------
-  function applyCommonFilters(q: any) {
-    if (fSymbol) q = q.eq("symbol", fSymbol);
-    if (fEA) q = q.eq("ea", fEA);
-    if (fSession) q = q.eq("session", fSession);
+  function applyCommonFilters(q: any, ov?: Partial<{
+  fSymbol: string; fEA: string; fSession: string;
+  qTicket: string; qId: string;
+  fDateFrom: string; fDateTo: string;
+  filterDate: string;
+}>) {
+  const _fSymbol  = ov?.fSymbol  ?? fSymbol;
+  const _fEA      = ov?.fEA      ?? fEA;
+  const _fSession = ov?.fSession ?? fSession;
+  const _qTicket  = ov?.qTicket  ?? qTicket;
+  const _qId      = ov?.qId      ?? qId;
+  const _from     = ov?.fDateFrom ?? fDateFrom;
+  const _to       = ov?.fDateTo   ?? fDateTo;
+  const _legacy   = ov?.filterDate ?? filterDate;
 
-    // ticket si viene en input o en URL
-    const tkt = (qTicket || initialRef.current.ticket || "").trim();
-    if (tkt) q = q.eq("ticket", tkt);
+  if (_fSymbol) q = q.eq("symbol", _fSymbol);
+  if (_fEA) q = q.eq("ea", _fEA);
+  if (_fSession) q = q.eq("session", _fSession);
 
-    // id numérico si viene en input o en URL
-    const idRaw = (qId || initialRef.current.id || "").trim();
-    if (idRaw && /^\d+$/.test(idRaw)) {
-      q = q.eq("id", Number(idRaw));
-    }
-    return q;
+const hasTicketOv = !!ov && Object.prototype.hasOwnProperty.call(ov, "qTicket");
+const tkt = (hasTicketOv ? _qTicket : (_qTicket || initialRef.current.ticket || "")).trim();
+
+  if (tkt) q = q.eq("ticket", tkt);
+
+const hasIdOv = !!ov && Object.prototype.hasOwnProperty.call(ov, "qId");
+const idRaw = (hasIdOv ? _qId : (_qId || initialRef.current.id || "")).trim();
+
+  if (idRaw && /^\d+$/.test(idRaw)) q = q.eq("id", Number(idRaw));
+
+  // rango (nuevo)
+  if (_from && _to) {
+    const { fromUtc, toUtcExclusive } = mazatlanRangeToUtc(_from, _to);
+    q = q.gte("dt_open_utc", fromUtc).lt("dt_open_utc", toUtcExclusive);
+  } else if (_from && !_to) {
+    const { fromUtc, toUtcExclusive } = mazatlanRangeToUtc(_from, _from);
+    q = q.gte("dt_open_utc", fromUtc).lt("dt_open_utc", toUtcExclusive);
+  } else if (!_from && _to) {
+    const { fromUtc, toUtcExclusive } = mazatlanRangeToUtc(_to, _to);
+    q = q.gte("dt_open_utc", fromUtc).lt("dt_open_utc", toUtcExclusive);
   }
+
+  // legacy (si lo dejas)
+  if (_legacy) {
+    const { from, to } = mazatlanDayRangeUtc(_legacy);
+    q = q.gte("dt_open_utc", from).lt("dt_open_utc", to);
+  }
+
+  return q;
+}
+
 
   // ---------- Trae total real y totalPages ----------
-  async function fetchTotal() {
-    let q = sb.from("trades").select("id", { count: "exact", head: true });
-    q = applyCommonFilters(q);
-    const { count, error } = await q;
-    if (!error && typeof count === "number") {
-      setTotal(count);
-      setTotalPages(Math.max(1, Math.ceil(count / PAGE)));
-    }
-  }
+async function fetchTotal(ov?: any) {
+  let q = sb.from("trades").select("id", { count: "exact", head: true });
+  q = applyCommonFilters(q, ov);
+
+  const { count, error } = await q;
+  if (error) throw new Error(error.message);
+
+  const t = count ?? 0;
+  setTotal(t);
+  const pages = Math.max(1, Math.ceil(t / PAGE));
+  setTotalPages(pages);
+  return t;
+}
+
+
 
   // ---------- Cargar página usando OFFSET (range) ----------
-  async function loadPage(reset = false): Promise<boolean> {
+async function loadPage(reset = false, ov?: any): Promise<boolean> {
+
     setLoading(true);
     setErr(null);
     try {
@@ -198,7 +291,8 @@ export default function TradesPage() {
         .order("dt_open_utc", { ascending: false })
         .order("id", { ascending: false });
 
-      q = applyCommonFilters(q);
+        q = applyCommonFilters(q, ov);
+
 
       const from = reset ? 0 : rows.length;
       const to = from + PAGE - 1;
@@ -239,6 +333,56 @@ export default function TradesPage() {
     await fetchTotal();
     await loadPage(true);
   }
+  
+  
+  
+  
+  
+  
+
+
+  
+  
+  async function clearFilters() {
+  flushSync(() => {
+    setFSymbol("");
+    setFEA("");
+    setFSession("");
+    setQId("");
+    setQTicket("");
+    setFDateFrom("");
+    setFDateTo("");
+    setFilterDateDraft("");
+    setFilterDate("");
+    setNoMore(false);
+    setPageIdx(1);
+  });
+
+  const ov = {
+    fSymbol: "",
+    fEA: "",
+    fSession: "",
+    qTicket: "",
+    qId: "",
+    fDateFrom: "",
+    fDateTo: "",
+    filterDate: "",
+  };
+
+  await fetchTotal(ov);
+  await loadPage(true, ov);
+}
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
   // ---------- Cargar más ----------
   async function handleLoadMore() {
@@ -324,131 +468,193 @@ export default function TradesPage() {
   return (
     <>
       <TopNav />
+      
       <div className="container">
-        <h1 className="title">Trades</h1>
-        {user && <p className="sub">Usuario: {user.email} · uid: {user.id}</p>}
-        {err && <p className="err">{err}</p>}
-
-        <div className="card" style={{ padding: 16 }}>
-          {/* Filtros principales */}
-          <div className="filters">
-            <div>
-              <label className="small">Símbolo</label>
-              <select
-                className="select"
-                value={fSymbol}
-                onChange={(e) => setFSymbol(e.target.value)}
-              >
-                <option value="">(Todos)</option>
-                {symbols.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="small">EA</label>
-              <select
-                className="select"
-                value={fEA}
-                onChange={(e) => setFEA(e.target.value)}
-              >
-                <option value="">(Todos)</option>
-                {eas.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="small">Sesión</label>
-              <select
-                className="select"
-                value={fSession}
-                onChange={(e) => setFSession(e.target.value)}
-              >
-                <option value="">(Todas)</option>
-                {sessions.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "end" }}>
-              <button className="btn primary" onClick={applyFilters}>
-                Aplicar filtros
-              </button>
-            </div>
-
-            {/* Búsqueda por Bitlog ID */}
-            <form
-              onSubmit={applyFilters}
-              style={{
-                display: "flex",
-                gap: 12,
-                alignItems: "end",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <label className="small">Bitlog ID</label>
-                <input
-                  className="input"
-                  value={qId}
-                  onChange={(e) => setQId(e.target.value)}
-                  placeholder="Ej. 361"
-                  inputMode="numeric"
-                  pattern="\d*"
-                  title="Solo números"
-                />
-              </div>
-              <div>
-                <button className="btn" type="submit" style={{ height: 34 }}>
-                  🔍
-                </button>
-              </div>
-            </form>
-
-            {/* Búsqueda por Ticket */}
-            <form
-              onSubmit={applyFilters}
-              style={{
-                display: "flex",
-                gap: 12,
-                alignItems: "end",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <label className="small">Ticket (broker)</label>
-                <input
-                  className="input"
-                  value={qTicket}
-                  onChange={(e) => setQTicket(e.target.value)}
-                  placeholder="Ej. 476665"
-                />
-              </div>
-              
-              <div>
-                <button className="btn" type="submit" style={{ height: 34 }}>
-                  🔍
-                </button>
-                
-              </div>
-            </form>
-            
-            {/* Resumen de resultados (cuantos trades resultaron del filtrado) */}
-              <div style={{ margin: "8px 0", color: "#4b5563" }}>
-                 Resultado: {total} trade{total === 1 ? "" : "s"}
-              </div>
-          </div>
+  <div className="card" style={{ padding: 16 }}>
 
           
+ {/* Fila inferior de filtros: Fecha + BitlogID + Ticket + Resultado (misma línea) */}
 
+<div
+  style={{
+    display: "flex",
+    gap: 12,
+    alignItems: "end",
+    flexWrap: "wrap",
+  }}
+>
+
+    
+    {/* Filtros principales */}
+<div>
+  <label className="small">Símbolo</label>
+  <select
+    className="select"
+    value={fSymbol}
+    onChange={(e) => setFSymbol(e.target.value)}
+  >
+    <option value="">(Todos)</option>
+    {symbols.map((s) => (
+      <option key={s} value={s}>
+        {s}
+      </option>
+    ))}
+  </select>
+</div>
+
+<div>
+  <label className="small">EA</label>
+  <select
+    className="select"
+    value={fEA}
+    onChange={(e) => setFEA(e.target.value)}
+  >
+    <option value="">(Todos)</option>
+    {eas.map((s) => (
+      <option key={s} value={s}>
+        {s}
+      </option>
+    ))}
+  </select>
+</div>
+
+<div>
+  <label className="small">Sesión</label>
+  <select
+    className="select"
+    value={fSession}
+    onChange={(e) => setFSession(e.target.value)}
+  >
+    <option value="">(Todas)</option>
+    {sessions.map((s) => (
+      <option key={s} value={s}>
+        {s}
+      </option>
+    ))}
+  </select>
+</div>
+
+<div style={{ display: "flex", alignItems: "end" }}>
+  <button className="btn primary" type="button" onClick={applyFilters}>
+  Aplicar
+</button>
+
+  
+  
+
+
+  <button className="btn" type="button" onClick={clearFilters}>
+  Limpiar
+</button>
+
+  
+  
+  
+  
+</div>
+
+{/* Bitlog ID */}
+<form
+  onSubmit={applyFilters}
+  style={{ display: "flex", gap: 12, alignItems: "end", flexWrap: "wrap" }}
+>
+  <div>
+    <label className="small">Bitlog ID</label>
+    <input
+      className="input"
+      value={qId}
+      onChange={(e) => setQId(e.target.value)}
+      placeholder="Ej. 361"
+      inputMode="numeric"
+      pattern="\d*"
+      title="Solo números"
+      style={{ width: 130 }}
+    />
+  </div>
+  <div>
+    <button className="btn" type="submit" style={{ height: 34 }}>
+      🔍
+    </button>
+  </div>
+</form>
+
+{/* Ticket (broker) */}
+<form
+  onSubmit={applyFilters}
+  style={{ display: "flex", gap: 12, alignItems: "end", flexWrap: "wrap" }}
+>
+  <div>
+    <label className="small">Ticket (broker)</label>
+    <input
+      className="input"
+      value={qTicket}
+      onChange={(e) => setQTicket(e.target.value)}
+      placeholder="Ej. 476665"
+      style={{ width: 180 }}
+    />
+  </div>
+  <div>
+    <button className="btn" type="submit" style={{ height: 34 }}>
+      🔍
+    </button>
+  </div>
+</form>
+
+
+
+
+{/* Rango de fechas (Open) + lupa SOLO para fechas */}
+<form
+  onSubmit={applyFilters}
+  style={{ display: "flex", gap: 12, alignItems: "end", flexWrap: "wrap" }}
+>
+
+  <div>
+    <label className="small">Fecha (desde)</label>
+    <input
+      type="date"
+      className="input"
+      value={fDateFrom}
+      onChange={(e) => setFDateFrom(e.target.value)}
+      style={{ width: 160 }}
+    />
+  </div>
+
+  <div>
+    <label className="small">Fecha (hasta)</label>
+    <input
+      type="date"
+      className="input"
+      value={fDateTo}
+      onChange={(e) => setFDateTo(e.target.value)}
+      style={{ width: 160 }}
+    />
+  </div>
+  <div>
+    <button className="btn" type="submit" style={{ height: 34 }}>
+      🔍
+    </button>
+    
+  </div>
+</form>
+
+
+{/* Resultado a la derecha, misma línea (sin romper grid) */}
+<div style={{ display: "flex", alignItems: "end", justifyContent: "flex-end" }}>
+
+
+
+
+
+
+
+  <div style={{ color: "#ffffff", paddingBottom: 6 }}>
+    Resultado: {total} trade{total === 1 ? "" : "s"}
+  </div>
+</div>
+
+</div>
+ 
           {/* Tabla */}
           <div className="table-wrap">
             <table className="tbl">
@@ -549,8 +755,12 @@ export default function TradesPage() {
 
             {loading && <span style={{ color: "#9ca3af" }}>Cargando…</span>}
           </div>
-        </div>
-      </div>
+          
+          </div>
+  </div>
+         
+          
+   
     </>
   );
 }

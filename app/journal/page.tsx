@@ -26,6 +26,26 @@ const MONTH_NAMES = [
 
 const WEEK_LABELS = ["L", "M", "M", "J", "V", "S", "D"];
 
+
+
+
+
+// Emojis (panel dropdown) — texto puro, no pesa
+const EMOJIS = [
+  "😀","🤣","😇","😘","😛","😜","🤪","🥰","😍","🤩","😘","😛","😜","🤪","🤑","🤔","🤨","😐","😑","😶","🤮","🤧","😵","😵‍💫","🤯","🥳","😎","🤓","🥸","😕","😟","☹️","😮","😯","😳","🥺","😧","😨","😰","😥","😭","😱","🤦‍♂️","😖","😞","😓","😩","😫","🥱","😡","😠","🤬","😈","💀","💩","🤡","🤖","💯","💥","👌","🤌","🤏","✌️","☝️","👊","👍","👐","🙏","✍️","💪","🧠","🫀","💔","❤️‍🔥","❤️","🥞","🧀","🥩","🍔","🍟","🍕","🌭","🌮","🍿","🍤","🍦","🍰","🥧","☕","🍾","🍷","🍹","🍺","🍻","🥂","🍽️","🍴","✨","🎈","🎉","🎊","🎁","🎖️","🏆","🏅","🥇","🎯","👨‍🎓","🧟","🧟‍♂️","🧟‍♀️","🧔","🌍","🌎","🏖️","🏝️","🌅","🌆","🌇","🌉","🚅","🚝","🚥","🚦","⌛","⏳","⌚","⏱️","🌒","🌔","🌞","⭐","🌟","☁️","⛅","⛈️","🌤️","🌩️","⛱️","⚡","❄️","🔥","🎩","🔇","📢","🔔","🔕","📔","📘","📚","📓","📒","📰","🗞️","📑","💰","🪙","💸","🖋️","🗂️","📅","🗓️","📌","📎","🗑️","💣","✅","☑️","✔️","❌","❎","0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟","⚠️","⛔","🚫","🚳"
+] as const;
+
+
+
+
+
+
+
+
+
+
+
+
 // YYYY-MM-DD en America/Mazatlan
 const fmtDateKey = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Mazatlan",
@@ -125,6 +145,13 @@ export default function JournalPage() {
   const [saving, setSaving] = React.useState<boolean>(false);
   const [saveMsg, setSaveMsg] = React.useState<string | null>(null);
   
+  
+  // ===================== [JRN-EMOJI-1] Emoji dropdown state =====================
+const notesRef = React.useRef<HTMLTextAreaElement | null>(null);
+const emojiWrapRef = React.useRef<HTMLDivElement | null>(null);
+const [emojiOpen, setEmojiOpen] = React.useState<boolean>(false);
+
+  
   // ===================== [JRN-SRCH-1] Search state =====================
 const [qText, setQText] = React.useState<string>("");
 const [qFrom, setQFrom] = React.useState<string>(""); // YYYY-MM-DD
@@ -142,6 +169,21 @@ const [searchResults, setSearchResults] = React.useState<JournalEntry[]>([]);
     if (v === 2) return "jrn-dot jrn-dot-yellow";
     return "jrn-dot jrn-dot-green";
   }
+  
+// ===================== [JRN-EMOJI-2] Cerrar panel de emojis al click fuera =====================
+React.useEffect(() => {
+  function onDocDown(e: MouseEvent) {
+    if (!emojiOpen) return;
+    const wrap = emojiWrapRef.current;
+    if (!wrap) return;
+    if (wrap.contains(e.target as Node)) return;
+    setEmojiOpen(false);
+  }
+  document.addEventListener("mousedown", onDocDown);
+  return () => document.removeEventListener("mousedown", onDocDown);
+}, [emojiOpen]);
+
+  
 
   // --------------------- [JRN-2.1] Load year ---------------------
   React.useEffect(() => {
@@ -307,6 +349,37 @@ function clearSearch() {
   setQTo("");
   setSearchErr(null);
   setSearchResults([]);
+}
+
+
+
+// ===================== [JRN-EMOJI-3] Insertar emoji en cursor del textarea (draft) =====================
+function insertEmojiAtCursor(emoji: string) {
+  const el = notesRef.current;
+  const current = draft ?? "";
+
+  if (!el) {
+    setDraft(current + emoji);
+    setEmojiOpen(false);
+    return;
+  }
+
+  const start = el.selectionStart ?? current.length;
+  const end = el.selectionEnd ?? current.length;
+
+  const next = current.slice(0, start) + emoji + current.slice(end);
+  setDraft(next);
+  setEmojiOpen(false);
+
+  requestAnimationFrame(() => {
+    try {
+      el.focus();
+      const pos = start + emoji.length;
+      el.setSelectionRange(pos, pos);
+    } catch {
+      // no-op
+    }
+  });
 }
 
 
@@ -572,7 +645,8 @@ Día objetivo: <span style={{ fontFamily: "monospace" }}>{fmtKey_DD_Mmm_YYYY(eff
 
               </div>
 
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+           <div style={{ display: "flex", gap: 10, alignItems: "center", position: "relative" }}>
+
               <button type="button" className="btn" onClick={() => handleSaveForDay(effectiveKey)} disabled={saving}>
                 {saving ? "Guardando..." : "Guardar"}
               </button>
@@ -587,6 +661,74 @@ Día objetivo: <span style={{ fontFamily: "monospace" }}>{fmtKey_DD_Mmm_YYYY(eff
   <option value={3}>🔴 Muy importante</option>
 </select>
 
+
+
+
+
+
+
+{/* ===================== [JRN-EMOJI-UI] Emojis dropdown ===================== */}
+<div ref={emojiWrapRef}>
+  <button
+    type="button"
+    className="btn secondary"
+    onClick={() => setEmojiOpen((v) => !v)}
+    aria-expanded={emojiOpen}
+  >
+    Emojis {emojiOpen ? "▲" : "▼"}
+  </button>
+
+  {emojiOpen && (
+    <div
+      style={{
+        position: "absolute",
+        top: "calc(100% + 8px)",
+        right: 0,
+        border: "1px solid rgba(0,0,0,0.12)",
+        borderRadius: 10,
+        padding: 10,
+        background: "white",
+        maxHeight: 180,
+        overflow: "auto",
+        zIndex: 200,
+        width: 360,
+      }}
+    >
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+        {EMOJIS.map((emo, i) => (
+          <button
+            key={`${emo}-${i}`}
+            type="button"
+            onClick={() => insertEmojiAtCursor(emo)}
+            title={emo}
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              border: "1px solid rgba(0,0,0,0.12)",
+              background: "white",
+              cursor: "pointer",
+              fontSize: 18,
+              lineHeight: "34px",
+              textAlign: "center",
+            }}
+          >
+            {emo}
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
+
+
+
+
+
+
+
+
+
               <button
                 type="button"
                 className="btn secondary"
@@ -599,13 +741,15 @@ Día objetivo: <span style={{ fontFamily: "monospace" }}>{fmtKey_DD_Mmm_YYYY(eff
             </div>
           </div>
 
-          <textarea
-            className="input"
-            style={{ marginTop: 10, minHeight: 220, width: "100%", resize: "vertical" }}
-            placeholder="Escribe tu nota del día: qué aprendiste, qué viste, qué sentiste, qué harás distinto mañana..."
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
+         <textarea
+  ref={notesRef}
+  className="input"
+  style={{ marginTop: 10, minHeight: 220, width: "100%", resize: "vertical" }}
+  placeholder="Escribe tu nota del día: qué aprendiste, qué viste, qué sentiste, qué harás distinto mañana..."
+  value={draft}
+  onChange={(e) => setDraft(e.target.value)}
+/>
+
 
           {saveMsg && <div className="ok" style={{ marginTop: 8 }}>{saveMsg}</div>}
         </section>

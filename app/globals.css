@@ -340,5 +340,16 @@ a.btn-del {
 }
 
 
+.value-strong {
+  font-weight: 800 !important;
+}
+
+.value-pos {
+  color: #28e061 !important;
+}
+
+.value-neg {
+  color: #f55662 !important;
+}
 
 
