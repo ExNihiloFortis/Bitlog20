@@ -1,6 +1,6 @@
 // ===================== [2] /trades/page.tsx =====================
 // - Barra TopNav arriba
-// - Filtros por símbolo/EA/sesión
+// - Filtros por símbolo/EA/sesión/Fecha
 // - Búsqueda exacta por Ticket y por Bitlog ID (numérico)
 // - Paginación de 50 en 50 con "páginaActual/totalPáginas"
 // - Ordenación en cliente por encabezado
@@ -14,7 +14,7 @@ import { createClient } from "@supabase/supabase-js";
 import TopNav from "@/components/TopNav";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";  // 👈 AÑADE ESTA LÍNEA
-import { flushSync } from "react-dom";
+
 
 
 // ...resto de tus imports que ya tengas...
@@ -339,24 +339,23 @@ async function loadPage(reset = false, ov?: any): Promise<boolean> {
   
   
   
-
-
+  
+  
+  
   
   
   async function clearFilters() {
-  flushSync(() => {
-    setFSymbol("");
-    setFEA("");
-    setFSession("");
-    setQId("");
-    setQTicket("");
-    setFDateFrom("");
-    setFDateTo("");
-    setFilterDateDraft("");
-    setFilterDate("");
-    setNoMore(false);
-    setPageIdx(1);
-  });
+  setFSymbol("");
+  setFEA("");
+  setFSession("");
+  setQId("");
+  setQTicket("");
+  setFDateFrom("");
+  setFDateTo("");
+  setFilterDateDraft("");
+  setFilterDate("");
+  setNoMore(false);
+  setPageIdx(1);
 
   const ov = {
     fSymbol: "",
@@ -373,16 +372,20 @@ async function loadPage(reset = false, ov?: any): Promise<boolean> {
   await loadPage(true, ov);
 }
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   // ---------- Cargar más ----------
   async function handleLoadMore() {
