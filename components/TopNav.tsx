@@ -21,8 +21,9 @@ const NAV_LINKS: NavLink[] = [
   { href: "/field-edits", label: "F.Edits" },
   { href: "/import", label: "Import" },
   { href: "/checklist", label: "Chklist" },
-  { href: "/calendar", label: "Cal" },
-  { href: "/journal", label: "Jrnl" },
+  { href: "/calendar", label: "📆" },
+  { href: "/whatif", label: "❎" },
+  { href: "/journal", label: "📔" },
   { href: "/charts", label: "Charts" },
   { href: "/fundamental", label: "News", isFundamental: true },
 ];

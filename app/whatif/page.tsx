@@ -1,0 +1,726 @@
+// ===================== /app/whatif/page.tsx =====================
+// [B1] Clon UI de /trades con selector + calculadora What-If (READ-ONLY)
+// - No guarda nada en Supabase
+// - Solo SELECTs
+// ===============================================================
+
+"use client";
+
+import * as React from "react";
+import TopNav from "@/components/TopNav";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { calcWhatIf } from "@/lib/whatif";
+
+// [B2] Tipos (copiados del shape de /trades/page.tsx) -------------------------
+type TradeRow = {
+  id: number;
+  ticket: string | null;
+  symbol: string | null;
+  side: string | null;
+  volume: number | null;
+  entry_price: number | null;
+  exit_price: number | null;
+  dt_open_utc: string | null;
+  dt_close_utc: string | null;
+  ea: string | null;
+  session: string | null;
+  pnl_usd_gross: number | null;
+};
+
+type OrderKey =
+  | "dt_open_utc"
+  | "ticket"
+  | "symbol"
+  | "side"
+  | "volume"
+  | "entry_price"
+  | "exit_price"
+  | "dt_close_utc"
+  | "pnl_usd_gross";
+
+// [B3] Helpers fecha Mazatlán (igual que /trades/page.tsx) -------------------
+function addDays(dateStr: string, delta: number) {
+  const [y, m, d] = dateStr.split("-").map((n) => parseInt(n, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function mazatlanDayRangeUtc(dateStr: string) {
+  // 00:00 Mazatlán == 07:00Z
+  const from = `${dateStr}T07:00:00Z`;
+  const to = `${addDays(dateStr, 1)}T07:00:00Z`;
+  return { from, to };
+}
+
+function cls(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
+}
+
+const fmtUSD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const fmtNum = new Intl.NumberFormat("en-US", { maximumFractionDigits: 8 });
+
+function asDT(iso: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  // mostrar “UTC-7” como ya lo haces en /trades (formato simple)
+  // Nota: aquí no recalculamos TZ; ya viene en UTC y lo muestras “como string”.
+  // Si en tu /trades lo conviertes distinto, dime y lo replico 1:1.
+  return d.toLocaleString("es-MX", { hour12: true });
+}
+
+// [B4] Página ---------------------------------------------------------------
+export default function WhatIfPage() {
+  // ---- Auth / estado base
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  // ---- Catálogos (para filtros)
+  const [symbols, setSymbols] = useState<string[]>([]);
+  const [eas, setEas] = useState<string[]>([]);
+  const [sessions, setSessions] = useState<string[]>([]);
+
+  // ---- Filtros (clon /trades)
+  const [fSymbol, setFSymbol] = useState("");
+  const [fEA, setFEA] = useState("");
+  const [fSession, setFSession] = useState("");
+  const [qTicket, setQTicket] = useState("");
+  const [qId, setQId] = useState("");
+  const [fDateFrom, setFDateFrom] = useState("");
+  const [fDateTo, setFDateTo] = useState("");
+  const [filterDate, setFilterDate] = useState(""); // legacy single day (si lo usas)
+
+  // ---- Data table
+  const [rows, setRows] = useState<TradeRow[]>([]);
+  const [pageIdx, setPageIdx] = useState(1);
+  const [pageSize] = useState(50);
+  const [noMore, setNoMore] = useState(false);
+
+  // ---- Orden cliente
+  const [orderBy, setOrderBy] = useState<OrderKey>("dt_open_utc");
+  const [orderAsc, setOrderAsc] = useState(false);
+
+  // ---- What-If panel
+  const [selected, setSelected] = useState<TradeRow | null>(null);
+  const [mode, setMode] = useState<"AUTO" | "MANUAL">("AUTO");
+
+  // inputs base (real)
+  const [wSymbol, setWSymbol] = useState("BTCUSD");
+  const [wOpen, setWOpen] = useState<number>(86340.84);
+  const [wCloseReal, setWCloseReal] = useState<number>(86282.13);
+  const [wLotReal, setWLotReal] = useState<number>(0.01);
+  const [wPnlReal, setWPnlReal] = useState<number>(0.59);
+
+  // what-if
+  const [wCloseHyp, setWCloseHyp] = useState<number>(86104.1827);
+  const [wLotHyp, setWLotHyp] = useState<number>(0.10);
+
+  // resultados
+  const [kValue, setKValue] = useState<number | null>(null);
+  const [pnlHyp, setPnlHyp] = useState<number | null>(null);
+  const [calcErr, setCalcErr] = useState<string | null>(null);
+
+  // [B5] Init: sesión + catálogos + primera carga ---------------------------
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        if (!sess?.session?.user) {
+          if (!alive) return;
+          setErr("No hay sesión. Entra a /login");
+          setLoading(false);
+          return;
+        }
+
+        // catálogos rápidos (únicos no nulos) — READ ONLY
+        const sb = supabase;
+        const [{ data: sym }, { data: ea }, { data: sesh }] = await Promise.all([
+          sb.from("trades").select("symbol").not("symbol", "is", null),
+          sb.from("trades").select("ea").not("ea", "is", null),
+          sb.from("trades").select("session").not("session", "is", null),
+        ]);
+
+        const uniq = (xs: any[] | null | undefined, k: string) => {
+          const s = new Set<string>();
+          (xs ?? []).forEach((r) => {
+            const v = r?.[k];
+            if (typeof v === "string" && v.trim()) s.add(v.trim());
+          });
+          return Array.from(s).sort((a, b) => a.localeCompare(b));
+        };
+
+        if (!alive) return;
+        setSymbols(uniq(sym, "symbol"));
+        setEas(uniq(ea, "ea"));
+        setSessions(uniq(sesh, "session"));
+
+        // carga inicial
+        await loadPage(true);
+      } catch (e: any) {
+        if (!alive) return;
+        setErr(e?.message ?? String(e));
+      } finally {
+        if (!alive) return;
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // [B6] Filtros comunes (clon /trades) -------------------------------------
+  function applyCommonFilters(q: any, ov?: Partial<{
+    fSymbol: string; fEA: string; fSession: string;
+    qTicket: string; qId: string;
+    fDateFrom: string; fDateTo: string;
+    filterDate: string;
+  }>) {
+    const _fSymbol  = ov?.fSymbol  ?? fSymbol;
+    const _fEA      = ov?.fEA      ?? fEA;
+    const _fSession = ov?.fSession ?? fSession;
+    const _qTicket  = ov?.qTicket  ?? qTicket;
+    const _qId      = ov?.qId      ?? qId;
+    const _from     = ov?.fDateFrom ?? fDateFrom;
+    const _to       = ov?.fDateTo   ?? fDateTo;
+    const _legacy   = ov?.filterDate ?? filterDate;
+
+    if (_fSymbol) q = q.eq("symbol", _fSymbol);
+    if (_fEA) q = q.eq("ea", _fEA);
+    if (_fSession) q = q.eq("session", _fSession);
+
+    // búsquedas exactas
+    if (_qTicket.trim()) q = q.eq("ticket", _qTicket.trim());
+    if (_qId.trim()) {
+      const n = Number(_qId.trim());
+      if (!Number.isNaN(n)) q = q.eq("id", n);
+    }
+
+    // rango por días (Mazatlán -> UTC)
+    if (_from) {
+      const { from } = mazatlanDayRangeUtc(_from);
+      q = q.gte("dt_open_utc", from);
+    }
+    if (_to) {
+      const { to } = mazatlanDayRangeUtc(_to);
+      q = q.lt("dt_open_utc", to);
+    }
+
+    // legacy single-day
+    if (_legacy) {
+      const { from, to } = mazatlanDayRangeUtc(_legacy);
+      q = q.gte("dt_open_utc", from).lt("dt_open_utc", to);
+    }
+
+    return q;
+  }
+
+  // [B7] Cargar página con OFFSET (range) — READ ONLY -----------------------
+  async function loadPage(reset = false, ov?: any): Promise<boolean> {
+    setLoading(true);
+    setErr(null);
+
+    try {
+      const sb = supabase;
+      const nextPageIdx = reset ? 1 : pageIdx + 1;
+      const from = (nextPageIdx - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let q = sb
+        .from("trades")
+        .select("id,ticket,symbol,side,volume,entry_price,exit_price,dt_open_utc,dt_close_utc,ea,session,pnl_usd_gross")
+        .order("dt_open_utc", { ascending: false })
+        .order("id", { ascending: false });
+
+      q = applyCommonFilters(q, ov);
+
+      const { data, error } = await q.range(from, to);
+      if (error) throw error;
+
+      const pageRows = (data ?? []) as TradeRow[];
+      if (reset) setRows(pageRows);
+      else setRows((prev) => [...prev, ...pageRows]);
+
+      setPageIdx(nextPageIdx);
+      setNoMore(pageRows.length < pageSize);
+      return true;
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // [B8] Orden en cliente (clon /trades) ------------------------------------
+  function toggleSort(k: OrderKey) {
+    if (orderBy === k) setOrderAsc(!orderAsc);
+    else {
+      setOrderBy(k);
+      setOrderAsc(true);
+    }
+  }
+
+  const viewRows = useMemo(() => {
+    const xs = [...rows];
+    xs.sort((a: any, b: any) => {
+      const av = a?.[orderBy];
+      const bv = b?.[orderBy];
+
+      // números
+      if (typeof av === "number" && typeof bv === "number") {
+        return orderAsc ? av - bv : bv - av;
+      }
+
+      // nulls
+      if (av == null && bv == null) return 0;
+      if (av == null) return orderAsc ? -1 : 1;
+      if (bv == null) return orderAsc ? 1 : -1;
+
+      return orderAsc
+        ? String(av).localeCompare(String(bv))
+        : String(bv).localeCompare(String(av));
+    });
+    return xs;
+  }, [rows, orderBy, orderAsc]);
+
+  // [B9] Aplicar filtros (resetea tabla) ------------------------------------
+  async function applyFilters(e: React.FormEvent) {
+    e.preventDefault();
+    setNoMore(false);
+    setPageIdx(1);
+    await loadPage(true, {
+      fSymbol, fEA, fSession, qTicket, qId, fDateFrom, fDateTo, filterDate,
+    });
+  }
+  
+  // [B9.1] Limpiar filtros (clon /trades)
+async function clearFilters() {
+  setFSymbol("");
+  setFEA("");
+  setFSession("");
+  setQTicket("");
+  setQId("");
+  setFDateFrom("");
+  setFDateTo("");
+  setFilterDate("");
+
+  setNoMore(false);
+  setPageIdx(1);
+
+  await loadPage(true, {
+    fSymbol: "",
+    fEA: "",
+    fSession: "",
+    qTicket: "",
+    qId: "",
+    fDateFrom: "",
+    fDateTo: "",
+    filterDate: "",
+  });
+}
+
+  
+  
+  
+
+  async function handleLoadMore() {
+    if (loading || noMore) return;
+    await loadPage(false);
+  }
+
+  // [B10] Seleccionar trade para What-If ------------------------------------
+  function onUseTrade(r: TradeRow) {
+    setSelected(r);
+    setMode("AUTO");
+
+    const sym = r.symbol ?? "";
+    const open = r.entry_price ?? NaN;
+    const close = r.exit_price ?? NaN;
+    const lot = r.volume ?? NaN;
+    const pnl = r.pnl_usd_gross ?? NaN;
+
+    if (sym) setWSymbol(sym);
+    if (isFinite(open)) setWOpen(open);
+    if (isFinite(close)) setWCloseReal(close);
+    if (isFinite(lot)) setWLotReal(lot);
+    if (isFinite(pnl)) setWPnlReal(pnl);
+
+    // defaults razonables
+    if (isFinite(close)) setWCloseHyp(close);
+    if (isFinite(lot)) setWLotHyp(lot);
+  }
+
+  // [B11] Recalcular What-If ------------------------------------------------
+  useEffect(() => {
+    try {
+      setCalcErr(null);
+      const { k, pnlHyp } = calcWhatIf({
+        openPrice: wOpen,
+        closePriceReal: wCloseReal,
+        lotReal: wLotReal,
+        pnlReal: wPnlReal,
+        closePriceHyp: wCloseHyp,
+        lotHyp: wLotHyp,
+      });
+      setKValue(k);
+      setPnlHyp(pnlHyp);
+    } catch (e: any) {
+      setKValue(null);
+      setPnlHyp(null);
+      setCalcErr(e?.message ?? String(e));
+    }
+  }, [wOpen, wCloseReal, wLotReal, wPnlReal, wCloseHyp, wLotHyp]);
+
+  // [B12] Render -------------------------------------------------------------
+  return (
+    <>
+      <TopNav />
+
+      <div className="container">
+        {/* [B12.1] Card 1 — Lista de trades (clon /trades) */}
+        <div className="card" style={{ padding: 16 }}>
+          <h2 style={{ margin: 0 }}>What-If (Read-only)</h2>
+          <div style={{ color: "#6b7280", marginTop: 6 }}>
+            Selecciona un trade real para autollenar la calculadora, o usa modo manual.
+          </div>
+
+          {err && (
+            <div style={{ marginTop: 12, color: "#ef4444" }}>
+              {err}
+            </div>
+          )}
+          
+          
+          
+          
+          
+
+          <form
+            onSubmit={applyFilters}
+            style={{ display: "flex", gap: 12, alignItems: "end", flexWrap: "wrap", marginTop: 14 }}
+          >
+            <div>
+              <label className="small">Símbolo</label>
+              <select className="input" value={fSymbol} onChange={(e) => setFSymbol(e.target.value)} style={{ width: 160 }}>
+                <option value="">(todos)</option>
+                {symbols.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="small">EA</label>
+              <select className="input" value={fEA} onChange={(e) => setFEA(e.target.value)} style={{ width: 160 }}>
+                <option value="">(todos)</option>
+                {eas.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="small">Sesión</label>
+              <select className="input" value={fSession} onChange={(e) => setFSession(e.target.value)} style={{ width: 160 }}>
+                <option value="">(todas)</option>
+                {sessions.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+          
+            
+            <div>
+  <label className="small">Desde</label>
+  <input
+    className="input"
+    type="date"
+    value={fDateFrom}
+    onChange={(e) => setFDateFrom(e.target.value)}
+    style={{ width: 170 }}
+  />
+</div>
+
+<div>
+  <label className="small">Hasta</label>
+  <input
+    className="input"
+    type="date"
+    value={fDateTo}
+    onChange={(e) => setFDateTo(e.target.value)}
+    style={{ width: 170 }}
+  />
+</div>
+
+            
+            
+            
+            
+            
+            
+            
+
+            <div>
+              <label className="small">Bitlog ID</label>
+              <input className="input" value={qId} onChange={(e) => setQId(e.target.value)} placeholder="Ej. 123" style={{ width: 120 }} />
+            </div>
+
+            <div>
+              <label className="small">Ticket (broker)</label>
+              <input className="input" value={qTicket} onChange={(e) => setQTicket(e.target.value)} placeholder="Ej. 476665" style={{ width: 160 }} />
+            </div>
+
+            <div>
+              <button className="btn" type="submit" disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
+                Aplicar
+              </button>
+            </div>
+            
+            <div>
+  <button
+    className="btn"
+    type="button"
+    onClick={clearFilters}
+    disabled={loading}
+    style={{ opacity: loading ? 0.6 : 1 }}
+  >
+    Limpiar
+  </button>
+</div>
+
+            
+            
+            
+            
+          </form>
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          <div className="table-wrap" style={{ marginTop: 14 }}>
+  <table className="tbl">
+
+
+          
+              <thead>
+                <tr>
+                  <th>Usar</th>
+                  {[
+                    ["ticket", "Ticket"],
+                    ["symbol", "Símbolo"],
+                    ["side", "Lado"],
+                    ["volume", "Vol"],
+                    ["entry_price", "Entry"],
+                    ["exit_price", "Exit"],
+                    ["dt_open_utc", "Open (UTC -7)"],
+                    ["dt_close_utc", "Close (UTC -7)"],
+                    ["pnl_usd_gross", "$P&L"],
+                  ].map(([k, label]) => (
+                    <th key={k} onClick={() => toggleSort(k as OrderKey)} style={{ cursor: "pointer" }}>
+                      {label}{orderBy === k ? (orderAsc ? " ▲" : " ▼") : ""}
+                    </th>
+                  ))}
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {viewRows.map((r) => (
+                  <tr key={r.id} className={selected?.id === r.id ? "row-selected" : ""}>
+                    <td>
+                      <button className="btn" type="button" onClick={() => onUseTrade(r)}>
+                        Usar
+                      </button>
+                    </td>
+
+                    <td>{r.ticket ?? ""}</td>
+                    <td>{r.symbol ?? ""}</td>
+                    <td>{r.side ?? ""}</td>
+
+                    <td className="num">{r.volume == null ? "" : fmtNum.format(r.volume)}</td>
+                    <td className="num">{r.entry_price == null ? "" : fmtNum.format(r.entry_price)}</td>
+                    <td className="num">{r.exit_price == null ? "" : fmtNum.format(r.exit_price)}</td>
+                    <td>{asDT(r.dt_open_utc)}</td>
+                    <td>{asDT(r.dt_close_utc)}</td>
+
+                    <td className={cls("num", (r.pnl_usd_gross ?? 0) >= 0 ? "pnl-pos" : "pnl-neg")}>
+                      {r.pnl_usd_gross == null ? "" : fmtUSD.format(r.pnl_usd_gross)}
+                    </td>
+
+                    <td style={{ display: "flex", gap: 8 }}>
+                      <a className="btn" href={`/trades/${r.id}/edit`}>Editar</a>
+                    </td>
+                  </tr>
+                ))}
+
+                {!viewRows.length && !loading && (
+                  <tr>
+                    <td colSpan={12} style={{ textAlign: "center", color: "#6b7280", padding: 16 }}>
+                      No hay resultados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginador */}
+          <div className="pager">
+            <button className="btn" disabled={loading || noMore} onClick={handleLoadMore} style={{ opacity: loading || noMore ? 0.5 : 1 }}>
+              {noMore ? "No hay más" : "Cargar más"}
+            </button>
+            {loading && <span style={{ color: "#9ca3af", marginLeft: 10 }}>Cargando…</span>}
+            <div style={{ marginTop: 8, color: "#6b7280" }}>
+              {pageIdx}
+            </div>
+          </div>
+        </div>
+
+        {/* [B12.2] Card 2 — Calculadora What-If */}
+        <div className="card" style={{ padding: 16, marginTop: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <h3 style={{ margin: 0 }}>Calculadora What-If</h3>
+              <div className="small" style={{ color: "#6b7280" }}>
+                {mode === "AUTO" ? "Auto (desde trade seleccionado)" : "Manual"}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn" type="button" onClick={() => setMode("AUTO")} style={{ opacity: mode === "AUTO" ? 1 : 0.6 }}>
+                Auto
+              </button>
+              <button className="btn" type="button" onClick={() => setMode("MANUAL")} style={{ opacity: mode === "MANUAL" ? 1 : 0.6 }}>
+                Manual
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+            <div>
+              <label className="small">Símbolo</label>
+              <input
+                className="input"
+                value={wSymbol}
+                onChange={(e) => mode === "MANUAL" && setWSymbol(e.target.value)}
+                disabled={mode === "AUTO"}
+                style={{ width: 160 }}
+              />
+            </div>
+
+            <div>
+              <label className="small">Open</label>
+              <input
+                className="input"
+                value={String(wOpen)}
+                onChange={(e) => mode === "MANUAL" && setWOpen(Number(e.target.value))}
+                disabled={mode === "AUTO"}
+                style={{ width: 180 }}
+              />
+            </div>
+
+            <div>
+              <label className="small">Close (real)</label>
+              <input
+                className="input"
+                value={String(wCloseReal)}
+                onChange={(e) => mode === "MANUAL" && setWCloseReal(Number(e.target.value))}
+                disabled={mode === "AUTO"}
+                style={{ width: 180 }}
+              />
+            </div>
+
+            <div>
+              <label className="small">Lot (real)</label>
+              <input
+                className="input"
+                value={String(wLotReal)}
+                onChange={(e) => mode === "MANUAL" && setWLotReal(Number(e.target.value))}
+                disabled={mode === "AUTO"}
+                style={{ width: 120 }}
+              />
+            </div>
+
+            <div>
+              <label className="small">P&L (real, USD)</label>
+              <input
+                className="input"
+                value={String(wPnlReal)}
+                onChange={(e) => mode === "MANUAL" && setWPnlReal(Number(e.target.value))}
+                disabled={mode === "AUTO"}
+                style={{ width: 140 }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+            <div>
+              <label className="small">Close (hipotético)</label>
+              <input className="input" value={String(wCloseHyp)} onChange={(e) => setWCloseHyp(Number(e.target.value))} style={{ width: 200 }} />
+            </div>
+
+            <div>
+              <label className="small">Lot (hipotético)</label>
+              <input className="input" value={String(wLotHyp)} onChange={(e) => setWLotHyp(Number(e.target.value))} style={{ width: 160 }} />
+            </div>
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            {calcErr ? (
+              <div style={{ color: "#ef4444" }}>{calcErr}</div>
+            ) : (
+              <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+                <div>
+                  <div className="small" style={{ color: "#6b7280" }}>k calibrado</div>
+                  <div style={{ fontSize: 18, fontWeight: 700 }}>
+                    {kValue == null ? "-" : fmtNum.format(kValue)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="small" style={{ color: "#6b7280" }}>P&L hipotético</div>
+                  <div style={{ fontSize: 18, fontWeight: 700 }}>
+                    {pnlHyp == null ? "-" : fmtUSD.format(pnlHyp)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="small" style={{ color: "#6b7280", marginTop: 10 }}>
+            Nota: esto usa tu P&L real como “calibración” (spread/comisiones ya implícitos). No se escribe nada a la BD.
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+.row-selected { box-shadow: inset 0 0 0 1px #1d4ed8; }
+      `}</style>
+    </>
+  );
+}
+
