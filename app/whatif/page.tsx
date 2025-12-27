@@ -654,16 +654,38 @@ async function clearFilters() {
               />
             </div>
 
-            <div>
-              <label className="small">Lot (real)</label>
-              <input
-                className="input"
-                value={String(wLotReal)}
-                onChange={(e) => mode === "MANUAL" && setWLotReal(Number(e.target.value))}
-                disabled={mode === "AUTO"}
-                style={{ width: 120 }}
-              />
-            </div>
+
+
+
+
+
+
+           <div>
+  <label className="small">Lot (real)</label>
+  <input
+    className="input"
+    type="number"
+    inputMode="decimal"
+    step="0.01"
+    min="0.01"
+    value={wLotReal}
+    onChange={(e) => {
+      if (mode !== "MANUAL") return;
+      const v = e.target.value;
+      setWLotReal(v === "" ? NaN : Number(v));
+    }}
+    disabled={mode === "AUTO"}
+    style={{ width: 120 }}
+  />
+</div>
+
+            
+            
+            
+            
+            
+            
+            
 
             <div>
               <label className="small">P&L (real, USD)</label>
@@ -683,10 +705,31 @@ async function clearFilters() {
               <input className="input" value={String(wCloseHyp)} onChange={(e) => setWCloseHyp(Number(e.target.value))} style={{ width: 200 }} />
             </div>
 
-            <div>
-              <label className="small">Lot (hipotético)</label>
-              <input className="input" value={String(wLotHyp)} onChange={(e) => setWLotHyp(Number(e.target.value))} style={{ width: 160 }} />
-            </div>
+
+
+
+           <div>
+  <label className="small">Lot (hipotético)</label>
+  <input
+    className="input"
+    type="number"
+    inputMode="decimal"
+    step="0.01"
+    min="0.01"
+    value={wLotHyp}
+    onChange={(e) => {
+      const v = e.target.value;
+      setWLotHyp(v === "" ? NaN : Number(v));
+    }}
+    style={{ width: 160 }}
+  />
+</div>
+
+            
+            
+            
+            
+            
           </div>
 
           <div style={{ marginTop: 14 }}>
