@@ -118,6 +118,8 @@ export default function WhatIfPage() {
   // what-if
   const [wCloseHyp, setWCloseHyp] = useState<number>(86104.1827);
   const [wLotHyp, setWLotHyp] = useState<number>(0.10);
+  const [total, setTotal] = useState<number>(0);
+
 
   // resultados
   const [kValue, setKValue] = useState<number | null>(null);
@@ -163,7 +165,9 @@ export default function WhatIfPage() {
         setSessions(uniq(sesh, "session"));
 
         // carga inicial
-        await loadPage(true);
+await fetchTotal();
+await loadPage(true);
+
       } catch (e: any) {
         if (!alive) return;
         setErr(e?.message ?? String(e));
@@ -178,6 +182,33 @@ export default function WhatIfPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  
+  
+  
+// ---------- Trae total real de trades ----------
+async function fetchTotal(ov?: any) {
+  let q = supabase
+    .from("trades")
+    // OJO: sin head:true (evita count null)
+    .select("id", { count: "exact" })
+    .limit(1);
+
+  q = applyCommonFilters(q, ov);
+
+  const { count, error } = await q;
+  if (error) throw error;
+
+  const t = count ?? 0;
+  setTotal(t);
+  return t;
+}
+
+
+
+  
+  
+  
 
   // [B6] Filtros comunes (clon /trades) -------------------------------------
   function applyCommonFilters(q: any, ov?: Partial<{
@@ -295,17 +326,35 @@ export default function WhatIfPage() {
   }, [rows, orderBy, orderAsc]);
 
   // [B9] Aplicar filtros (resetea tabla) ------------------------------------
-  async function applyFilters(e: React.FormEvent) {
-    e.preventDefault();
-    setNoMore(false);
-    setPageIdx(1);
-    await loadPage(true, {
-      fSymbol, fEA, fSession, qTicket, qId, fDateFrom, fDateTo, filterDate,
-    });
-  }
+
+async function applyFilters(e: React.FormEvent) {
+  e.preventDefault();
+
+  const ov = { fSymbol, fEA, fSession, qTicket, qId, fDateFrom, fDateTo, filterDate };
+
+  setNoMore(false);
+  setPageIdx(1);
+
+  await fetchTotal(ov);
+  await loadPage(true, ov);
+}
+
+  
+  
   
   // [B9.1] Limpiar filtros (clon /trades)
 async function clearFilters() {
+  const ov = {
+    fSymbol: "",
+    fEA: "",
+    fSession: "",
+    qTicket: "",
+    qId: "",
+    fDateFrom: "",
+    fDateTo: "",
+    filterDate: "",
+  };
+
   setFSymbol("");
   setFEA("");
   setFSession("");
@@ -318,21 +367,11 @@ async function clearFilters() {
   setNoMore(false);
   setPageIdx(1);
 
-  await loadPage(true, {
-    fSymbol: "",
-    fEA: "",
-    fSession: "",
-    qTicket: "",
-    qId: "",
-    fDateFrom: "",
-    fDateTo: "",
-    filterDate: "",
-  });
+  // IMPORTANTE: primero total, luego tabla
+  await fetchTotal(ov);
+  await loadPage(true, ov);
 }
 
-  
-  
-  
 
   async function handleLoadMore() {
     if (loading || noMore) return;
@@ -492,9 +531,13 @@ async function clearFilters() {
   >
     Limpiar
   </button>
+
+
 </div>
 
-            
+              <div style={{ color: "#ffffff", paddingBottom: 6 }}>
+  Resultado: {total} trade{total === 1 ? "" : "s"}
+</div>
             
             
             
