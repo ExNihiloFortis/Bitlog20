@@ -24,8 +24,8 @@ const NAV_LINKS: NavLink[] = [
   { href: "/calendar", label: "📆" },
   { href: "/whatif", label: "❎" },
   { href: "/journal", label: "📔" },
-  { href: "/charts", label: "Charts" },
-  { href: "/fundamental", label: "News", isFundamental: true },
+  { href: "/charts", label: "📊" },
+  { href: "/fundamental", label: "📰", isFundamental: true },
 ];
 
 export default function TopNav() {

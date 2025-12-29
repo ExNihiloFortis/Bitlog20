@@ -927,7 +927,7 @@ const balanceRows = useMemo(() => {
     marginTop: 12,
     paddingTop: 10,
     borderTop: "1px solid rgba(255,255,255,0.08)",
-    color: "#96918F",
+    color: "#ffffff",
     lineHeight: 1.6,
 
   }}
@@ -935,54 +935,21 @@ const balanceRows = useMemo(() => {
   <div>
     <strong>Fórmula:</strong> RiesgoUSD = TP/RR, Balance = RiesgoUSD / (%Riesgo).
   </div>
-  
-  
-  
-  
-  
+
   <div style={{ marginTop: 6 }}>
-  <strong>k calibrado</strong>
-  <div>{kValue == null ? "-" : fmtNum.format(kValue)}</div>
-</div>
+    <strong>k calibrado</strong>
+    <div className="num">{kValue == null ? "-" : fmtNum.format(kValue)}</div>
+  </div>
 
-<div style={{ marginTop: 6 }}>
-  <strong>P&amp;L hipotético</strong>
-  <div>{pnlHyp == null ? "-" : fmtUSD.format(pnlHyp)}</div>
-</div>
-
-
- 
-
-
+  <div style={{ marginTop: 6 }}>
+    <strong>P&amp;L hipotético</strong>
+    <div className="num">{pnlHyp == null ? "-" : fmtUSD.format(pnlHyp)}</div>
+  </div>
 
   <div style={{ marginTop: 6, fontStyle: "italic" }}>
     Nota: esto usa tu P&amp;L real como “calibración” (spread/comisiones ya implícitos). No se escribe nada a la BD.
   </div>
-  
-  
-  
-  
-  
 </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
           
           {/* [B12.3] Balance recomendado por % riesgo y R:R */}

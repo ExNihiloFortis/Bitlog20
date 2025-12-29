@@ -353,3 +353,46 @@ a.btn-del {
 }
 
 
+/* Centrar contenido de tablas específicas */
+.tbl-center th,
+.tbl-center td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+
+/* WhatIf: centrar TODO dentro de esta tabla */
+.tbl-center th,
+.tbl-center td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Override: en Bitlog, .num suele alinear a la derecha.
+   Aquí lo forzamos a centro SOLO en tablas con .tbl-center */
+.tbl-center th.num,
+.tbl-center td.num {
+  text-align: center !important;
+}
+
+
+/* WhatIf: forzar centrado incluso en primera columna del header */
+.tbl-center thead th:first-child {
+  text-align: center !important;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
