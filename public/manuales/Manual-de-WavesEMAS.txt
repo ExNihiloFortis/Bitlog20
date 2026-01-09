@@ -1,6 +1,7 @@
 📘 MÓDULO 0 — VISIÓN GENERAL DEL EA WavesEMAS
 ------------------------------------------
-ESTRATEGIA GENERAL
+
+					ESTRATEGIA:
 
 1.- Ver Grafico a H4 para Identificar  Y MARCAR si hay:
 	a) Patrón Chartista (Canal, Triangulo, Bandera o Cuña)
@@ -8,8 +9,9 @@ ESTRATEGIA GENERAL
 	c) Si el precio esta en S/R ( MUY IMPORTANTE, SOLO se entra A FAVOR en el BORDE )
 	d) Si hay FVGs o OBs Mas arriba o abajo EN DIRECCION del precio
 	e) IDENTIFICAR LA TENDENCIA usando las EMAS
-	f) Que dicen los Indicadores (RSI/ESTOCASTICO/VOLUMEN)
-	G) -- Marcar TODO lo que se haya encontrado que sea Indispensable --
+	f) Trazar NIVELES CLAVE con un Fibonacci
+	g) Que dicen los Indicadores (RSI/ESTOCASTICO/VOLUMEN)
+	H) -- Marcar TODO lo que se haya encontrado que sea Indispensable --
 
 ------------------------
 2.- Bajar a H1 para Identificar Y MARCAR si hay:
@@ -18,8 +20,9 @@ ESTRATEGIA GENERAL
 	c) Si el precio esta en S/R ( MUY IMPORTANTE, SOLO se entra A FAVOR en el BORDE )
 	d) Si hay FVGs o OBs Mas arriba o abajo EN DIRECCION del precio
 	e) IDENTIFICAR LA TENDENCIA usando las EMAS
-	f) Que dicen los Indicadores (RSI/ESTOCASTICO/VOLUMEN)
-	G) -- Marcar TODO lo que se haya encontrado que sea Indispensable --
+	f) Trazar NIVELES CLAVE con un Fibonacci
+	g) Que dicen los Indicadores (RSI/ESTOCASTICO/VOLUMEN)
+	H) -- Marcar TODO lo que se haya encontrado que sea Indispensable --
 
 ------------------------
 
@@ -29,8 +32,9 @@ ESTRATEGIA GENERAL
 	c) Si el precio esta en S/R ( MUY IMPORTANTE, SOLO se entra A FAVOR en el BORDE )
 	d) Si hay FVGs o OBs Mas arriba o abajo EN DIRECCION del precio
 	e) IDENTIFICAR LA TENDENCIA usando las EMAS
-	f) Que dicen los Indicadores (RSI/ESTOCASTICO/VOLUMEN)
-	G) -- Marcar TODO lo que se haya encontrado que sea Indispensable --
+	f) Trazar NIVELES CLAVE con un Fibonacci
+	g) Que dicen los Indicadores (RSI/ESTOCASTICO/VOLUMEN)
+	H) -- Marcar TODO lo que se haya encontrado que sea Indispensable --
 
 ------------------------
 4.- Bajar a M5 para Identificar Y MARCAR si hay:
@@ -39,8 +43,9 @@ ESTRATEGIA GENERAL
 	c) Si el precio esta en S/R ( MUY IMPORTANTE, SOLO se entra A FAVOR en el BORDE )
 	d) Si hay FVGs o OBs Mas arriba o abajo EN DIRECCION del precio
 	e) IDENTIFICAR LA TENDENCIA usando las EMAS
-	f) Que dicen los Indicadores (RSI/ESTOCASTICO/VOLUMEN)
-	G) -- Marcar TODO lo que se haya encontrado que sea Indispensable --
+	f) Trazar NIVELES CLAVE con un Fibonacci
+	g) Que dicen los Indicadores (RSI/ESTOCASTICO/VOLUMEN)
+	H) -- Marcar TODO lo que se haya encontrado que sea Indispensable --
 
 -------------------------
 5.- TOMAR LA DECISION DE SI ENTRAR U OPERAR.
@@ -58,7 +63,7 @@ así que se tiene que tomar en cuenta:
 - Patrón Chartista (Canal, Triangulo, Bandera, Cuña Doble TOP/Bottom)
 - Si el precio esta en S/R ( --- MUY MUY IMPORTANTE --- )
 - Si hay FVGs o OBs Mas arriba o abajo EN DIRECCION  HACIA DONDE VA el precio
-------------------------------------------
+-------------------------------------------------------------------------
 
 Este EA NO abre operaciones.
 Su trabajo es decirte:
