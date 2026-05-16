@@ -280,6 +280,83 @@ export default function CalendarPage() {
     }
     setSelectedDayKey(key);
   }
+  
+  
+  
+    // [CAL-3.3] Totales por mes para mini-calendarios
+  function getMonthStats(monthIdx0: number) {
+    const prefix = `${year}-${String(monthIdx0 + 1).padStart(2, "0")}-`;
+
+    let ops = 0;
+    let wins = 0;
+    let losses = 0;
+    let winUsd = 0;
+    let lossUsd = 0;
+    let total = 0;
+
+    for (const t of trades) {
+      const key = dayKeyFromUtc(t.dt_open_utc);
+      if (!key || !key.startsWith(prefix)) continue;
+
+      const pnl = t.pnl_usd_gross ?? 0;
+
+      ops += 1;
+      total += pnl;
+
+      if (pnl >= 0) {
+        wins += 1;
+        winUsd += pnl;
+      } else {
+        losses += 1;
+        lossUsd += Math.abs(pnl);
+      }
+    }
+
+    return { ops, wins, losses, winUsd, lossUsd, total };
+  }
+  
+  
+  
+  
+  
+  
+  
+  
+  
+    // [CAL-3.4] Estadísticas por día (para calendario grande)
+  function getDayStats(dayKey: string) {
+    const dayTrades = tradesByDay[dayKey] ?? [];
+
+    let ops = 0;
+    let wins = 0;
+    let losses = 0;
+    let total = 0;
+
+    for (const t of dayTrades) {
+      const pnl = t.pnl_usd_gross ?? 0;
+
+      ops += 1;
+      total += pnl;
+
+      if (pnl >= 0) wins += 1;
+      else losses += 1;
+    }
+
+    return { ops, wins, losses, total };
+  }
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
   // --------------------- [CAL-4] Render helpers -------------------------
   // [CAL-4.1] Mini calendario (cuadrícula de 12 meses)
@@ -367,6 +444,40 @@ export default function CalendarPage() {
             </div>
           ))}
         </div>
+        
+        
+        
+        
+        
+             {/* [CAL-4.1.1] Totales mensuales del mini-calendario */}
+        {(() => {
+          const stats = getMonthStats(monthIdx0);
+
+          return (
+            <div
+              style={{
+                marginTop: 6,
+                paddingTop: 5,
+                borderTop: "1px solid #1f2937",
+                fontSize: 9,
+                lineHeight: 1.35,
+                color: "#e5e7eb",
+                textAlign: "left",
+              }}
+            >
+              Ops.: {stats.ops}, {stats.wins} wins ={" "}
+              <span className="pnl-pos">{fmtUSD.format(stats.winUsd)}</span>{" "}
+              / {stats.losses} loss ={" "}
+              <span className="pnl-neg">{fmtUSD.format(stats.lossUsd)}</span>.
+              {" "} P&amp;L ={" "}
+              <span className={stats.total >= 0 ? "pnl-pos" : "pnl-neg"}>
+                {fmtUSD.format(stats.total)}
+              </span>
+            </div>
+          );
+        })()}   
+        
+
       </button>
     );
   }
@@ -470,6 +581,47 @@ export default function CalendarPage() {
                         })}
                       </div>
                     )}
+                    
+                    
+                    
+                    
+                                        {/* [CAL-4.2.1] Totales del día */}
+                    {trades.length > 0 && (() => {
+                      const stats = getDayStats(key);
+
+                      return (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            paddingTop: 5,
+                            borderTop: "1px solid #1f2937",
+                            fontSize: 10,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          <div>
+                            Ops: {stats.ops} | W:{stats.wins} | L:{stats.losses}
+                          </div>
+
+                          <div
+                            className={
+                              stats.total >= 0 ? "pnl-pos" : "pnl-neg"
+                            }
+                            style={{ fontWeight: 700 }}
+                          >
+                            P&amp;L: {fmtUSD.format(stats.total)}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
                   </div>
                 );
               })}
@@ -477,13 +629,51 @@ export default function CalendarPage() {
           ))}
         </div>
 
-        {/* Total mensual */}
-        <div className="calendar-month-footer">
-          <span>Total P&amp;L del mes:&nbsp;</span>
-          <span className={monthTotal >= 0 ? "pnl-pos" : "pnl-neg"}>
-            {fmtUSD.format(monthTotal)}
-          </span>
-        </div>
+    
+    
+    
+    
+    
+    
+    
+    
+            {/* [CAL-4.2.2] Resumen mensual del calendario grande */}
+        {(() => {
+          const stats = getMonthStats(selectedMonth);
+
+          return (
+            <div className="calendar-month-footer">
+              Ops.: {stats.ops}, {stats.wins} wins ={" "}
+              <span className="pnl-pos">
+                {fmtUSD.format(stats.winUsd)}
+              </span>{" "}
+              / {stats.losses} loss ={" "}
+              <span className="pnl-neg">
+                {fmtUSD.format(stats.lossUsd)}
+              </span>
+              . Total P&amp;L ={" "}
+              <span
+                className={stats.total >= 0 ? "pnl-pos" : "pnl-neg"}
+              >
+                {fmtUSD.format(stats.total)}
+              </span>
+            </div>
+          );
+        })()}
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
       </div>
     );
   }

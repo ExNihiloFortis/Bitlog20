@@ -281,8 +281,9 @@ a.btn-del {
 }
 
 .calendar-day-cell-big {
-  min-height: 70px;
+  min-height: 105px;
 }
+
 
 .calendar-day-number-big {
   font-size: 11px;
