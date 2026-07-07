@@ -15,6 +15,8 @@ import {
   Pie,
   Cell,
   CartesianGrid,
+  LineChart,
+  Line,
 } from "recharts";
 
 type TradeRow = {
@@ -26,7 +28,6 @@ type TradeRow = {
   session: string | null;
   dt_open_utc: string | null;
   dt_close_utc: string | null;
-  // --- Campos extra para export PRO ---
   volume: number | null;
   entry_price: number | null;
   exit_price: number | null;
@@ -53,63 +54,14 @@ type TradeRow = {
 
 type PerfRow = {
   key: string;
+  parts: string[];
   trades: number;
   wins: number;
   losses: number;
   winRate: number;
   pnl: number;
-};
-
-type ComboRow = {
-  ea: string;
-  symbol: string;
-  timeframe: string;
-  trades: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  pnl: number;
-};
-
-type ConfluenceRow = {
-  ea: string;
-  symbol: string;
-  timeframe: string;
-  extra: string;
-  trades: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  pnl: number;
-};
-
-type DayOfWeekRow = {
-  dayIndex: number;
-  label: string;
-  trades: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  pnl: number;
-};
-
-type CloseReasonRow = {
-  reason: string;
-  trades: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  pnl: number;
-};
-
-type HourOfDayRow = {
-  hour: number;
-  label: string;
-  trades: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  pnl: number;
+  avgPnL: number;
+  score: number;
 };
 
 type FilterPreset = {
@@ -121,7 +73,50 @@ type FilterPreset = {
   tf: string;
   side: string;
   session: string;
+  emocion: string;
+  patron: string;
+  vela: string;
+  day: string;
+  hour: string;
 };
+
+type DimensionKey =
+  | "ea"
+  | "symbol"
+  | "timeframe"
+  | "session"
+  | "day"
+  | "hour"
+  | "patron"
+  | "emocion"
+  | "side"
+  | "vela";
+
+type MetricKey = "pnl" | "winRate" | "trades";
+
+type SortDir = "asc" | "desc";
+
+type MetricSortKey = "trades" | "wins" | "losses" | "winRate" | "pnl";
+
+type SortState =
+  | { colType: "part"; colIndex: number; dir: SortDir }
+  | { colType: "metric"; metric: MetricSortKey; dir: SortDir }
+  | null;
+
+type DetailSortKey =
+  | "id"
+  | "ticket"
+  | "symbol"
+  | "timeframe"
+  | "side"
+  | "ea"
+  | "session"
+  | "patron"
+  | "vela"
+  | "emocion"
+  | "open"
+  | "close"
+  | "pnl";
 
 const CARD_STYLE: React.CSSProperties = {
   backgroundColor: "#111",
@@ -144,6 +139,7 @@ const TH_STYLE: React.CSSProperties = {
   backgroundColor: "#000",
   color: "#ccc",
   borderBottom: "1px solid #333",
+  userSelect: "none",
 };
 
 const TD_STYLE_BASE: React.CSSProperties = {
@@ -159,8 +155,49 @@ const BADGE_STYLE_BASE: React.CSSProperties = {
   fontWeight: 600,
 };
 
+const ICON_BTN_STYLE: React.CSSProperties = {
+  cursor: "pointer",
+  fontSize: 12,
+  lineHeight: 1,
+  color: "#9ca3af",
+  background: "transparent",
+  border: "1px solid #333",
+  borderRadius: 4,
+  padding: "3px 6px",
+  userSelect: "none",
+};
+
+const GREEN = "#22c55e";
+const RED = "#ef4444";
+const NEUTRAL = "#737373";
+const GRID = "#2a2a2a";
+const AXIS = "#cfcfcf";
+
+const DIMENSION_OPTIONS: [DimensionKey, string][] = [
+  ["ea", "EA"],
+  ["symbol", "Símbolo"],
+  ["timeframe", "TF"],
+  ["session", "Sesión"],
+  ["day", "Día"],
+  ["hour", "Hora"],
+  ["patron", "Patrón"],
+  ["vela", "Vela"],
+  ["emocion", "Emoción"],
+  ["side", "Dirección"],
+];
+
+const DIMENSION_LABELS: Record<DimensionKey, string> = DIMENSION_OPTIONS.reduce(
+  (acc, [k, l]) => {
+    acc[k] = l;
+    return acc;
+  },
+  {} as Record<DimensionKey, string>
+);
+
+const WEEKDAY_ORDER = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+
 function safeNumber(n: number | null | undefined): number {
-  if (n === null || n === undefined || Number.isNaN(n)) return 0;
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return 0;
   return Number(n);
 }
 
@@ -172,8 +209,7 @@ function fmtPct(p: number): string {
 function fmtMoney(n: number): string {
   if (!isFinite(n)) return "$0.00";
   const sign = n >= 0 ? "" : "-";
-  const abs = Math.abs(n);
-  return `${sign}$${abs.toFixed(2)}`;
+  return `${sign}$${Math.abs(n).toFixed(2)}`;
 }
 
 function fmtDateShort(s: string | null): string {
@@ -190,7 +226,6 @@ function fmtDateShort(s: string | null): string {
   });
 }
 
-// Formato HH:MM:SS para duración promedio
 function formatDurationHMS(ms: number): string {
   if (!isFinite(ms) || ms <= 0) return "0s";
   const totalSeconds = Math.floor(ms / 1000);
@@ -203,37 +238,6 @@ function formatDurationHMS(ms: number): string {
   return `${seconds}s`;
 }
 
-// Heatmap color para EA × TF
-function getHeatCellColor(winRate: number, trades: number): string {
-  if (trades === 0) return "#111111";
-  if (trades < 3) return "#222222";
-  if (winRate >= 70) return "#1b5e20";
-  if (winRate >= 55) return "#33691e";
-  if (winRate >= 45) return "#424242";
-  if (winRate >= 30) return "#b71c1c";
-  return "#880e4f";
-}
-
-// Hora local Mazatlán a partir de dt_open_utc
-function getHourMazatlan(dateStr: string): number {
-  try {
-    const d = new Date(dateStr);
-    if (Number.isNaN(d.getTime())) return 0;
-    const formatter = new Intl.DateTimeFormat("en-GB", {
-      hour: "2-digit",
-      hour12: false,
-      timeZone: "America/Mazatlan",
-    });
-    const hourStr = formatter.format(d);
-    const h = parseInt(hourStr, 10);
-    if (Number.isNaN(h)) return 0;
-    return h;
-  } catch {
-    return 0;
-  }
-}
-
-// Fecha YYYY-MM-DD en Mazatlán
 function getTodayMazatlan(): string {
   const now = new Date();
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -253,33 +257,557 @@ function addDaysToDateString(dateStr: string, delta: number): string {
   if (!y || !m || !d) return dateStr;
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + delta);
-  const yy = dt.getUTCFullYear();
-  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getUTCDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 
-/* =========================
-   TOP NAV (estilo Charts)
-   ========================= */
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
-   
+function getHourMazatlan(dateStr: string): number {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return 0;
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    hour12: false,
+    timeZone: "America/Mazatlan",
+  });
+  const h = parseInt(formatter.format(d), 10);
+  return Number.isNaN(h) ? 0 : h;
+}
+
+function getDayMazatlan(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "SIN_FECHA";
+  return new Intl.DateTimeFormat("es-MX", {
+    weekday: "long",
+    timeZone: "America/Mazatlan",
+  }).format(d);
+}
+
+function getTradeDimensionValue(t: TradeRow, dim: DimensionKey): string {
+  if (dim === "ea") return (t.ea || "SIN_EA").trim() || "SIN_EA";
+  if (dim === "symbol") return (t.symbol || "SIN_SYMBOL").trim() || "SIN_SYMBOL";
+  if (dim === "timeframe") return (t.timeframe || "SIN_TF").trim() || "SIN_TF";
+  if (dim === "session") return (t.session || "SIN_SESION").trim() || "SIN_SESION";
+  if (dim === "patron") return (t.patron || "SIN_PATRON").trim() || "SIN_PATRON";
+  if (dim === "emocion") return (t.emocion || "SIN_EMOCION").trim() || "SIN_EMOCION";
+  if (dim === "side") return (t.side || "SIN_DIRECCION").trim().toUpperCase() || "SIN_DIRECCION";
+  if (dim === "vela") return (t.vela || "SIN_VELA").trim() || "SIN_VELA";
+  if (dim === "hour") return t.dt_open_utc ? `${String(getHourMazatlan(t.dt_open_utc)).padStart(2, "0")}:00` : "SIN_HORA";
+  if (dim === "day") return t.dt_open_utc ? getDayMazatlan(t.dt_open_utc) : "SIN_FECHA";
+  return "—";
+}
+
+function aggregateTrades(trades: TradeRow[], dimensions: DimensionKey[]): PerfRow[] {
+  const map = new Map<string, { parts: string[]; trades: number; wins: number; losses: number; pnl: number }>();
+
+  trades.forEach((t) => {
+    const parts = dimensions.map((d) => getTradeDimensionValue(t, d));
+    const key = parts.join(" + ");
+    if (!map.has(key)) map.set(key, { parts, trades: 0, wins: 0, losses: 0, pnl: 0 });
+    const rec = map.get(key)!;
+    const pnl = safeNumber(t.pnl_usd_gross);
+    rec.trades += 1;
+    rec.pnl += pnl;
+    if (pnl > 0) rec.wins += 1;
+    else if (pnl < 0) rec.losses += 1;
+  });
+
+  const rows: PerfRow[] = [];
+  map.forEach((v, key) => {
+    const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
+    const avgPnL = v.trades > 0 ? v.pnl / v.trades : 0;
+    const sampleFactor = Math.min(v.trades / 10, 1);
+    const score = winRate * 0.55 + Math.max(Math.min(avgPnL * 10, 30), -30) + sampleFactor * 15;
+    rows.push({ key, parts: v.parts, trades: v.trades, wins: v.wins, losses: v.losses, winRate, pnl: v.pnl, avgPnL, score });
+  });
+
+  rows.sort((a, b) => {
+    if (b.pnl !== a.pnl) return b.pnl - a.pnl;
+    return b.trades - a.trades;
+  });
+  return rows;
+}
+
+function getQualityBadge(row: PerfRow, minTrades: number) {
+  if (row.trades < minTrades) return { label: "Muestra baja", bg: "#424242" };
+  if (row.pnl > 0 && row.winRate >= 60) return { label: "Fuerte", bg: "#166534" };
+  if (row.pnl > 0 && row.winRate >= 50) return { label: "Prometedor", bg: "#365314" };
+  if (row.pnl < 0 && row.winRate < 50) return { label: "Evitar", bg: "#991b1b" };
+  return { label: "Neutral", bg: "#374151" };
+}
+
+function csvEscape(value: any) {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  if (s.includes('"') || s.includes(",") || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+  const csv = [headers.map(csvEscape).join(","), ...rows.map((r) => r.map(csvEscape).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ===================== Dropdown de filtro estilo TopNav ===================== */
+
+function FilterDropdown({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder = "(Todos)",
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="field">
+      <div className="label">{label}</div>
+      <div style={{ position: "relative" }} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "6px 10px",
+            fontSize: 13,
+            height: 32,
+            borderRadius: 0,
+            border: value ? "1px solid #1d4ed8" : "1px solid #333",
+            backgroundColor: value ? "#1d4ed8" : "#000",
+            color: value ? "#ffffff" : "#ccc",
+            fontWeight: value ? 600 : 400,
+            cursor: "pointer",
+          }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value || placeholder}</span>
+          <span style={{ fontSize: 10, opacity: 0.8, marginLeft: 6 }}>▾</span>
+        </button>
+        {open && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              minWidth: 170,
+              maxHeight: 260,
+              overflowY: "auto",
+              background: "#020617",
+              border: "1px solid #1f2937",
+              boxShadow: "0 14px 30px rgba(0,0,0,0.35)",
+              padding: 6,
+              zIndex: 100,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+              }}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                padding: "8px 10px",
+                fontSize: 13,
+                border: "1px solid transparent",
+                backgroundColor: !value ? "#1d4ed8" : "transparent",
+                color: !value ? "#ffffff" : "#cbd5e1",
+                fontWeight: !value ? 600 : 400,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {placeholder}
+            </button>
+            {options.map((opt) => {
+              const active = value === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt);
+                    setOpen(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    border: "1px solid transparent",
+                    backgroundColor: active ? "#1d4ed8" : "transparent",
+                    color: active ? "#ffffff" : "#cbd5e1",
+                    fontWeight: active ? 600 : 400,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!active) e.currentTarget.style.backgroundColor = "#111827";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ===================== Tabla genérica: sort + highlight + CSV ===================== */
+
+function PerfTable({
+  title,
+  rows,
+  columns,
+  minTrades,
+  idPrefix,
+}: {
+  title: string;
+  rows: PerfRow[];
+  columns: string[];
+  minTrades: number;
+  idPrefix: string;
+}) {
+  const [sortState, setSortState] = useState<SortState>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  const displayRows = useMemo(() => {
+    if (!sortState) return rows;
+    const copy = rows.slice();
+    const dir = sortState.dir === "asc" ? 1 : -1;
+    copy.sort((a, b) => {
+      if (sortState.colType === "part") {
+        const av = a.parts[sortState.colIndex] ?? "";
+        const bv = b.parts[sortState.colIndex] ?? "";
+        return dir * String(av).localeCompare(String(bv));
+      }
+      const av = a[sortState.metric];
+      const bv = b[sortState.metric];
+      return dir * (av - bv);
+    });
+    return copy;
+  }, [rows, sortState]);
+
+  const handleSortPart = (idx: number) => {
+    setSortState((prev) => {
+      if (prev && prev.colType === "part" && prev.colIndex === idx) {
+        return { colType: "part", colIndex: idx, dir: prev.dir === "asc" ? "desc" : "asc" };
+      }
+      return { colType: "part", colIndex: idx, dir: "asc" };
+    });
+  };
+
+  const handleSortMetric = (metric: MetricSortKey) => {
+    setSortState((prev) => {
+      if (prev && prev.colType === "metric" && prev.metric === metric) {
+        return { colType: "metric", metric, dir: prev.dir === "asc" ? "desc" : "asc" };
+      }
+      return { colType: "metric", metric, dir: "desc" };
+    });
+  };
+
+  const arrowFor = (metric: MetricSortKey) =>
+    sortState && sortState.colType === "metric" && sortState.metric === metric ? (sortState.dir === "asc" ? " ▲" : " ▼") : "";
+
+  const handleExportTableCsv = () => {
+    if (!displayRows.length) return;
+    const headers = [...columns, "Trades", "Wins", "Losses", "Win%", "PnL", "Calidad"];
+    const dataRows = displayRows.map((r) => [
+      ...r.parts,
+      r.trades,
+      r.wins,
+      r.losses,
+      `${r.winRate.toFixed(1)}%`,
+      r.pnl.toFixed(2),
+      getQualityBadge(r, minTrades).label,
+    ]);
+    downloadCsv(`bitlog_${idPrefix}.csv`, headers, dataRows);
+  };
+
+  return (
+    <div style={CARD_STYLE}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {sortState && (
+            <button type="button" title="Restaurar orden original" onClick={() => setSortState(null)} style={ICON_BTN_STYLE}>
+              ↺
+            </button>
+          )}
+          <h2 style={{ margin: 0, fontSize: 15 }}>{title}</h2>
+        </div>
+        <button type="button" title="Descargar CSV" onClick={handleExportTableCsv} style={ICON_BTN_STYLE}>
+          ⬇
+        </button>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={TABLE_STYLE}>
+          <thead>
+            <tr>
+              {columns.map((label, idx) => (
+                <th key={`col-${idx}`} style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortPart(idx)}>
+                  {label}
+                  {sortState && sortState.colType === "part" && sortState.colIndex === idx ? (sortState.dir === "asc" ? " ▲" : " ▼") : ""}
+                </th>
+              ))}
+              <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("trades")}>
+                Trades{arrowFor("trades")}
+              </th>
+              <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("wins")}>
+                Wins{arrowFor("wins")}
+              </th>
+              <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("losses")}>
+                Losses{arrowFor("losses")}
+              </th>
+              <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("winRate")}>
+                Win%{arrowFor("winRate")}
+              </th>
+              <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("pnl")}>
+                PnL{arrowFor("pnl")}
+              </th>
+              <th style={TH_STYLE}>Calidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayRows.map((row, idx) => {
+              const isSelected = selectedKey === row.key;
+              const isHovered = hoveredKey === row.key;
+              const bg = isSelected ? "#1d4ed8" : isHovered ? "#1f2937" : idx % 2 === 0 ? "#151515" : "#101010";
+              const rowStyle: React.CSSProperties = { ...TD_STYLE_BASE, backgroundColor: bg, cursor: "pointer" };
+              const badge = getQualityBadge(row, minTrades);
+              return (
+                <tr
+                  key={row.key}
+                  onClick={() => setSelectedKey((prev) => (prev === row.key ? null : row.key))}
+                  onMouseEnter={() => setHoveredKey(row.key)}
+                  onMouseLeave={() => setHoveredKey(null)}
+                >
+                  {row.parts.map((p, i) => (
+                    <td key={i} style={rowStyle}>
+                      {p}
+                    </td>
+                  ))}
+                  <td style={rowStyle}>{row.trades}</td>
+                  <td style={{ ...rowStyle, color: isSelected ? "#fff" : GREEN }}>{row.wins}</td>
+                  <td style={{ ...rowStyle, color: isSelected ? "#fff" : RED }}>{row.losses}</td>
+                  <td style={rowStyle}>{fmtPct(row.winRate)}</td>
+                  <td style={{ ...rowStyle, color: isSelected ? "#fff" : row.pnl > 0 ? GREEN : row.pnl < 0 ? RED : "#ccc" }}>{fmtMoney(row.pnl)}</td>
+                  <td style={rowStyle}>
+                    <span style={{ ...BADGE_STYLE_BASE, backgroundColor: badge.bg, color: "#fff" }}>{badge.label}</span>
+                  </td>
+                </tr>
+              );
+            })}
+            {displayRows.length === 0 && (
+              <tr>
+                <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={columns.length + 6}>
+                  Sin datos en este filtro.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ===================== Tabla de detalle de trades: sort + highlight ===================== */
+
+function TradeDetailTable({ trades }: { trades: TradeRow[] }) {
+  const [sortKey, setSortKey] = useState<DetailSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+
+  const getSortValue = (t: TradeRow, key: DetailSortKey): string | number => {
+    switch (key) {
+      case "id":
+        return t.id;
+      case "ticket":
+        return t.ticket || "";
+      case "symbol":
+        return t.symbol || "";
+      case "timeframe":
+        return t.timeframe || "";
+      case "side":
+        return t.side || "";
+      case "ea":
+        return t.ea || "";
+      case "session":
+        return t.session || "";
+      case "patron":
+        return t.patron || "";
+      case "vela":
+        return t.vela || "";
+      case "emocion":
+        return t.emocion || "";
+      case "open":
+        return t.dt_open_utc ? new Date(t.dt_open_utc).getTime() : 0;
+      case "close":
+        return t.dt_close_utc ? new Date(t.dt_close_utc).getTime() : 0;
+      case "pnl":
+        return safeNumber(t.pnl_usd_gross);
+      default:
+        return "";
+    }
+  };
+
+  const displayTrades = useMemo(() => {
+    if (!sortKey) return trades;
+    const copy = trades.slice();
+    const dir = sortDir === "asc" ? 1 : -1;
+    copy.sort((a, b) => {
+      const av = getSortValue(a, sortKey);
+      const bv = getSortValue(b, sortKey);
+      if (typeof av === "string" || typeof bv === "string") return dir * String(av).localeCompare(String(bv));
+      return dir * ((av as number) - (bv as number));
+    });
+    return copy;
+  }, [trades, sortKey, sortDir]);
+
+  const handleSort = (key: DetailSortKey) => {
+    if (sortKey === key) {
+      setSortDir((prevDir) => (prevDir === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const arrow = (key: DetailSortKey) => (sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : "");
+
+  const columns: { key: DetailSortKey; label: string }[] = [
+    { key: "id", label: "ID" },
+    { key: "ticket", label: "Ticket" },
+    { key: "symbol", label: "Símbolo" },
+    { key: "timeframe", label: "TF" },
+    { key: "side", label: "Dirección" },
+    { key: "ea", label: "EA" },
+    { key: "session", label: "Sesión" },
+    { key: "patron", label: "Patrón" },
+    { key: "vela", label: "Vela" },
+    { key: "emocion", label: "Emoción" },
+    { key: "open", label: "Open" },
+    { key: "close", label: "Close" },
+    { key: "pnl", label: "PnL" },
+  ];
+
+  return (
+    <div style={CARD_STYLE}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        {sortKey && (
+          <button type="button" title="Restaurar orden original" onClick={() => setSortKey(null)} style={ICON_BTN_STYLE}>
+            ↺
+          </button>
+        )}
+        <h2 style={{ margin: 0, fontSize: 15 }}>Detalle de trades filtrados</h2>
+      </div>
+      <div style={{ maxHeight: 360, overflow: "auto", borderRadius: 8, border: "1px solid #222" }}>
+        <table style={TABLE_STYLE}>
+          <thead>
+            <tr>
+              {columns.map((c) => (
+                <th key={c.key} style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSort(c.key)}>
+                  {c.label}
+                  {arrow(c.key)}
+                </th>
+              ))}
+              <th style={TH_STYLE}>Ver</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayTrades.map((t, idx) => {
+              const pnl = safeNumber(t.pnl_usd_gross);
+              const isSelected = selectedId === t.id;
+              const isHovered = hoveredId === t.id;
+              const bg = isSelected ? "#1d4ed8" : isHovered ? "#1f2937" : idx % 2 === 0 ? "#151515" : "#101010";
+              const tdBase: React.CSSProperties = { ...TD_STYLE_BASE, backgroundColor: bg, cursor: "pointer" };
+              return (
+                <tr
+                  key={t.id}
+                  onClick={() => setSelectedId((prev) => (prev === t.id ? null : t.id))}
+                  onMouseEnter={() => setHoveredId(t.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                >
+                  <td style={tdBase}>{t.id}</td>
+                  <td style={tdBase}>{t.ticket || "—"}</td>
+                  <td style={tdBase}>{t.symbol || "—"}</td>
+                  <td style={tdBase}>{t.timeframe || "—"}</td>
+                  <td style={tdBase}>{(t.side || "—").toUpperCase()}</td>
+                  <td style={tdBase}>{t.ea || "—"}</td>
+                  <td style={tdBase}>{t.session || "—"}</td>
+                  <td style={tdBase}>{t.patron || "—"}</td>
+                  <td style={tdBase}>{t.vela || "—"}</td>
+                  <td style={tdBase}>{t.emocion || "—"}</td>
+                  <td style={tdBase}>{fmtDateShort(t.dt_open_utc)}</td>
+                  <td style={tdBase}>{fmtDateShort(t.dt_close_utc)}</td>
+                  <td style={{ ...tdBase, color: isSelected ? "#fff" : pnl > 0 ? GREEN : pnl < 0 ? RED : "#ccc" }}>{fmtMoney(pnl)}</td>
+                  <td style={tdBase} onClick={(e) => e.stopPropagation()}>
+                    <a href={`/trades/${t.id}`} className="btn link" style={{ fontSize: 11, padding: "3px 6px" }}>
+                      Ver
+                    </a>
+                  </td>
+                </tr>
+              );
+            })}
+            {displayTrades.length === 0 && (
+              <tr>
+                <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={14}>
+                  Sin trades en este filtro.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ===================== Tooltip de mini-gráficas con conteo de trades ===================== */
+
+function MiniChartTooltipContent({ active, payload }: { active?: boolean; payload?: any[] }) {
+  if (!active || !payload || !payload.length) return null;
+  const row: PerfRow = payload[0].payload;
+  return (
+    <div style={{ backgroundColor: "#111", border: "1px solid #333", padding: "8px 10px", fontSize: 12 }}>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>{row.key}</div>
+      <div style={{ opacity: 0.85 }}>
+        {row.trades} tr. | {row.wins} W | {row.losses} L
+      </div>
+      <div style={{ marginTop: 2, color: row.pnl > 0 ? GREEN : row.pnl < 0 ? RED : "#ccc" }}>P&amp;L {fmtMoney(row.pnl)}</div>
+    </div>
+  );
+}
 
 export default function ChartsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trades, setTrades] = useState<TradeRow[]>([]);
 
-  // Filtros globales (draft + aplicados)
   const [filterDateFromDraft, setFilterDateFromDraft] = useState("");
   const [filterDateToDraft, setFilterDateToDraft] = useState("");
   const [filterEaDraft, setFilterEaDraft] = useState("");
@@ -287,6 +815,11 @@ export default function ChartsPage() {
   const [filterTfDraft, setFilterTfDraft] = useState("");
   const [filterSideDraft, setFilterSideDraft] = useState("");
   const [filterSessionDraft, setFilterSessionDraft] = useState("");
+  const [filterEmocionDraft, setFilterEmocionDraft] = useState("");
+  const [filterPatronDraft, setFilterPatronDraft] = useState("");
+  const [filterVelaDraft, setFilterVelaDraft] = useState("");
+  const [filterDayDraft, setFilterDayDraft] = useState("");
+  const [filterHourDraft, setFilterHourDraft] = useState("");
 
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
@@ -295,25 +828,22 @@ export default function ChartsPage() {
   const [filterTf, setFilterTf] = useState("");
   const [filterSide, setFilterSide] = useState("");
   const [filterSession, setFilterSession] = useState("");
+  const [filterEmocion, setFilterEmocion] = useState("");
+  const [filterPatron, setFilterPatron] = useState("");
+  const [filterVela, setFilterVela] = useState("");
+  const [filterDay, setFilterDay] = useState("");
+  const [filterHour, setFilterHour] = useState("");
 
-  // Presets de filtros
   const [presets, setPresets] = useState<FilterPreset[]>([]);
   const [presetName, setPresetName] = useState("");
   const [selectedPresetName, setSelectedPresetName] = useState("");
 
-  // Filtro de confluencias
-  const [confEa, setConfEa] = useState("");
-  const [confSymbol, setConfSymbol] = useState("");
-  const [confTf, setConfTf] = useState("");
-  const [confSession, setConfSession] = useState("");
-  const [confEmocion, setConfEmocion] = useState("");
-  const [confPatron, setConfPatron] = useState("");
-  const [confVela, setConfVela] = useState("");
-  const [confFiltersApplied, setConfFiltersApplied] = useState(false);
+  const [minTrades, setMinTrades] = useState(3);
+  const [dynamicMetric, setDynamicMetric] = useState<MetricKey>("pnl");
+  const [dynamicDims, setDynamicDims] = useState<DimensionKey[]>(["ea", "symbol", "timeframe"]);
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       setLoading(true);
       setError(null);
@@ -325,7 +855,6 @@ export default function ChartsPage() {
           setTrades([]);
           return;
         }
-
         const { data, error: qErr } = await supabase
           .from("trades")
           .select("*")
@@ -333,12 +862,8 @@ export default function ChartsPage() {
           .order("dt_open_utc", { ascending: false, nullsFirst: false })
           .order("id", { ascending: false })
           .limit(2000);
-
         if (qErr) throw qErr;
-
-        if (!cancelled) {
-          setTrades((data || []) as unknown as TradeRow[]);
-        }
+        if (!cancelled) setTrades((data || []) as unknown as TradeRow[]);
       } catch (err: any) {
         if (!cancelled) {
           setError(String(err?.message ?? err));
@@ -348,44 +873,34 @@ export default function ChartsPage() {
         if (!cancelled) setLoading(false);
       }
     }
-
     load();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Cargar presets desde localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem("bitlog_chart_presets");
       if (raw) {
         const parsed = JSON.parse(raw) as FilterPreset[];
-        if (Array.isArray(parsed)) {
-          setPresets(parsed);
-        }
+        if (Array.isArray(parsed)) setPresets(parsed);
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
-  // Guardar presets en localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       window.localStorage.setItem("bitlog_chart_presets", JSON.stringify(presets));
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, [presets]);
 
-  // Catálogos
   const allEAs = useMemo(() => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.ea) s.add(t.ea);
+      if (t.ea?.trim()) s.add(t.ea.trim());
     });
     return Array.from(s).sort();
   }, [trades]);
@@ -393,7 +908,7 @@ export default function ChartsPage() {
   const allSymbols = useMemo(() => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.symbol) s.add(t.symbol);
+      if (t.symbol?.trim()) s.add(t.symbol.trim());
     });
     return Array.from(s).sort();
   }, [trades]);
@@ -401,7 +916,7 @@ export default function ChartsPage() {
   const allTimeframes = useMemo(() => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.timeframe) s.add(t.timeframe);
+      if (t.timeframe?.trim()) s.add(t.timeframe.trim());
     });
     return Array.from(s).sort();
   }, [trades]);
@@ -409,7 +924,7 @@ export default function ChartsPage() {
   const allSessions = useMemo(() => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.session) s.add(t.session);
+      if (t.session?.trim()) s.add(t.session.trim());
     });
     return Array.from(s).sort();
   }, [trades]);
@@ -417,7 +932,7 @@ export default function ChartsPage() {
   const allEmociones = useMemo(() => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.emocion) s.add(t.emocion);
+      if (t.emocion?.trim()) s.add(t.emocion.trim());
     });
     return Array.from(s).sort();
   }, [trades]);
@@ -425,7 +940,7 @@ export default function ChartsPage() {
   const allPatrones = useMemo(() => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.patron) s.add(t.patron);
+      if (t.patron?.trim()) s.add(t.patron.trim());
     });
     return Array.from(s).sort();
   }, [trades]);
@@ -433,41 +948,160 @@ export default function ChartsPage() {
   const allVelas = useMemo(() => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.vela) s.add(t.vela);
+      if (t.vela?.trim()) s.add(t.vela.trim());
     });
     return Array.from(s).sort();
   }, [trades]);
 
-  // Global filters apply / clear
-  const handleApplyGlobalFilters = () => {
-    setFilterDateFrom(filterDateFromDraft);
-    setFilterDateTo(filterDateToDraft);
-    setFilterEa(filterEaDraft);
-    setFilterSymbol(filterSymbolDraft);
-    setFilterTf(filterTfDraft);
-    setFilterSide(filterSideDraft);
-    setFilterSession(filterSessionDraft);
-  };
+  const allDays = useMemo(() => {
+    const s = new Set<string>();
+    trades.forEach((t) => {
+      if (t.dt_open_utc) s.add(getDayMazatlan(t.dt_open_utc));
+    });
+    return Array.from(s).sort((a, b) => {
+      const ia = WEEKDAY_ORDER.indexOf(a.toLowerCase());
+      const ib = WEEKDAY_ORDER.indexOf(b.toLowerCase());
+      if (ia === -1 || ib === -1) return a.localeCompare(b);
+      return ia - ib;
+    });
+  }, [trades]);
 
-  const handleClearGlobalFilters = () => {
-    setFilterDateFromDraft("");
-    setFilterDateToDraft("");
-    setFilterEaDraft("");
-    setFilterSymbolDraft("");
-    setFilterTfDraft("");
-    setFilterSideDraft("");
-    setFilterSessionDraft("");
+  const allHours = useMemo(() => {
+    const s = new Set<string>();
+    trades.forEach((t) => {
+      if (t.dt_open_utc) s.add(`${String(getHourMazatlan(t.dt_open_utc)).padStart(2, "0")}:00`);
+    });
+    return Array.from(s).sort();
+  }, [trades]);
 
-    setFilterDateFrom("");
-    setFilterDateTo("");
-    setFilterEa("");
-    setFilterSymbol("");
-    setFilterTf("");
-    setFilterSide("");
-    setFilterSession("");
-  };
+  const visibleTrades = useMemo(() => {
+    let list = trades.slice();
+    if (filterDateFrom) {
+      const dFrom = new Date(filterDateFrom + "T00:00:00");
+      list = list.filter((t) => !!t.dt_open_utc && new Date(t.dt_open_utc) >= dFrom);
+    }
+    if (filterDateTo) {
+      const dTo = new Date(filterDateTo + "T23:59:59");
+      list = list.filter((t) => !!t.dt_open_utc && new Date(t.dt_open_utc) <= dTo);
+    }
+    if (filterEa) list = list.filter((t) => (t.ea || "").toUpperCase() === filterEa.toUpperCase());
+    if (filterSymbol) list = list.filter((t) => (t.symbol || "").toUpperCase() === filterSymbol.toUpperCase());
+    if (filterTf) list = list.filter((t) => (t.timeframe || "").toUpperCase() === filterTf.toUpperCase());
+    if (filterSide) list = list.filter((t) => (t.side || "").toUpperCase() === filterSide.toUpperCase());
+    if (filterSession) list = list.filter((t) => (t.session || "").toUpperCase() === filterSession.toUpperCase());
+    if (filterEmocion) list = list.filter((t) => (t.emocion || "").toUpperCase() === filterEmocion.toUpperCase());
+    if (filterPatron) list = list.filter((t) => (t.patron || "").toUpperCase() === filterPatron.toUpperCase());
+    if (filterVela) list = list.filter((t) => (t.vela || "").toUpperCase() === filterVela.toUpperCase());
+    if (filterDay) list = list.filter((t) => (t.dt_open_utc ? getDayMazatlan(t.dt_open_utc) : "SIN_FECHA") === filterDay);
+    if (filterHour)
+      list = list.filter(
+        (t) => (t.dt_open_utc ? `${String(getHourMazatlan(t.dt_open_utc)).padStart(2, "0")}:00` : "SIN_HORA") === filterHour
+      );
+    return list;
+  }, [
+    trades,
+    filterDateFrom,
+    filterDateTo,
+    filterEa,
+    filterSymbol,
+    filterTf,
+    filterSide,
+    filterSession,
+    filterEmocion,
+    filterPatron,
+    filterVela,
+    filterDay,
+    filterHour,
+  ]);
 
-  // Presets rápidos (Hoy, 7d, 30d, Solo NY)
+  const summary = useMemo(() => {
+    const total = visibleTrades.length;
+    let wins = 0;
+    let losses = 0;
+    let pnl = 0;
+    visibleTrades.forEach((t) => {
+      const v = safeNumber(t.pnl_usd_gross);
+      pnl += v;
+      if (v > 0) wins++;
+      else if (v < 0) losses++;
+    });
+    return {
+      total,
+      wins,
+      losses,
+      winRate: total ? (wins / total) * 100 : 0,
+      pnl,
+      avgPnL: total ? pnl / total : 0,
+    };
+  }, [visibleTrades]);
+
+  const avgDurationMs = useMemo(() => {
+    let totalMs = 0;
+    let count = 0;
+    visibleTrades.forEach((t) => {
+      if (!t.dt_open_utc || !t.dt_close_utc) return;
+      const open = new Date(t.dt_open_utc).getTime();
+      const close = new Date(t.dt_close_utc).getTime();
+      if (!Number.isNaN(open) && !Number.isNaN(close) && close > open) {
+        totalMs += close - open;
+        count++;
+      }
+    });
+    return count ? totalMs / count : 0;
+  }, [visibleTrades]);
+
+  const perfByEA = useMemo(() => aggregateTrades(visibleTrades, ["ea"]), [visibleTrades]);
+  const perfBySymbol = useMemo(() => aggregateTrades(visibleTrades, ["symbol"]), [visibleTrades]);
+  const perfByTimeframe = useMemo(() => aggregateTrades(visibleTrades, ["timeframe"]), [visibleTrades]);
+  const perfBySession = useMemo(() => aggregateTrades(visibleTrades, ["session"]), [visibleTrades]);
+  const perfByDay = useMemo(() => aggregateTrades(visibleTrades, ["day"]), [visibleTrades]);
+  const perfByHour = useMemo(() => aggregateTrades(visibleTrades, ["hour"]), [visibleTrades]);
+  const perfByPatron = useMemo(() => aggregateTrades(visibleTrades, ["patron"]), [visibleTrades]);
+  const perfByEmocion = useMemo(() => aggregateTrades(visibleTrades, ["emocion"]), [visibleTrades]);
+  const perfBySide = useMemo(() => aggregateTrades(visibleTrades, ["side"]), [visibleTrades]);
+
+  const confluenceBase = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe"]), [visibleTrades]);
+  const confluencePatron = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "patron"]), [visibleTrades]);
+  const confluenceVela = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "vela"]), [visibleTrades]);
+  const confluenceEmocion = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "emocion"]), [visibleTrades]);
+  const confluenceSession = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "session"]), [visibleTrades]);
+  const confluenceSide = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "side"]), [visibleTrades]);
+
+  const dynamicConfluence = useMemo(() => aggregateTrades(visibleTrades, dynamicDims), [visibleTrades, dynamicDims]);
+  const dynamicColumnLabels = useMemo(() => dynamicDims.map((d) => DIMENSION_LABELS[d]), [dynamicDims]);
+
+  const topBest = useMemo(() => dynamicConfluence.filter((r) => r.trades >= minTrades && r.pnl > 0).slice(0, 5), [dynamicConfluence, minTrades]);
+  const topWorst = useMemo(
+    () =>
+      dynamicConfluence
+        .filter((r) => r.trades >= minTrades && r.pnl < 0)
+        .slice()
+        .sort((a, b) => a.pnl - b.pnl)
+        .slice(0, 5),
+    [dynamicConfluence, minTrades]
+  );
+
+  const equityCurve = useMemo(() => {
+    let acc = 0;
+    return visibleTrades
+      .slice()
+      .filter((t) => !!t.dt_open_utc)
+      .sort((a, b) => new Date(a.dt_open_utc || "").getTime() - new Date(b.dt_open_utc || "").getTime())
+      .map((t, idx) => {
+        acc += safeNumber(t.pnl_usd_gross);
+        return { n: idx + 1, pnl: acc, label: fmtDateShort(t.dt_open_utc) };
+      });
+  }, [visibleTrades]);
+
+  const pieWinLossData = useMemo(
+    () => [
+      { name: "Wins", value: summary.wins },
+      { name: "Losses", value: summary.losses },
+      { name: "Neutros", value: Math.max(summary.total - summary.wins - summary.losses, 0) },
+    ],
+    [summary]
+  );
+
   const applyQuickPreset = (type: "today" | "7d" | "30d" | "ny") => {
     if (type === "today") {
       const today = getTodayMazatlan();
@@ -489,23 +1123,58 @@ export default function ChartsPage() {
       setFilterDateToDraft(today);
       setFilterDateFrom(from);
       setFilterDateTo(today);
-    } else if (type === "ny") {
-      const nyOption =
-        allSessions.find((s) => s.toUpperCase().includes("NY")) ||
-        allSessions.find((s) => s.toUpperCase().includes("NEW YORK")) ||
-        "";
-      if (nyOption) {
-        setFilterSessionDraft(nyOption);
-        setFilterSession(nyOption);
-      }
+    } else {
+      const ny = allSessions.find((s) => s.toUpperCase().includes("NY")) || allSessions.find((s) => s.toUpperCase().includes("NEW YORK")) || "";
+      setFilterSessionDraft(ny);
+      setFilterSession(ny);
     }
   };
 
-  // Guardar preset favorito
+  const handleApplyGlobalFilters = () => {
+    setFilterDateFrom(filterDateFromDraft);
+    setFilterDateTo(filterDateToDraft);
+    setFilterEa(filterEaDraft);
+    setFilterSymbol(filterSymbolDraft);
+    setFilterTf(filterTfDraft);
+    setFilterSide(filterSideDraft);
+    setFilterSession(filterSessionDraft);
+    setFilterEmocion(filterEmocionDraft);
+    setFilterPatron(filterPatronDraft);
+    setFilterVela(filterVelaDraft);
+    setFilterDay(filterDayDraft);
+    setFilterHour(filterHourDraft);
+  };
+
+  const handleClearGlobalFilters = () => {
+    setFilterDateFromDraft("");
+    setFilterDateToDraft("");
+    setFilterEaDraft("");
+    setFilterSymbolDraft("");
+    setFilterTfDraft("");
+    setFilterSideDraft("");
+    setFilterSessionDraft("");
+    setFilterEmocionDraft("");
+    setFilterPatronDraft("");
+    setFilterVelaDraft("");
+    setFilterDayDraft("");
+    setFilterHourDraft("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setFilterEa("");
+    setFilterSymbol("");
+    setFilterTf("");
+    setFilterSide("");
+    setFilterSession("");
+    setFilterEmocion("");
+    setFilterPatron("");
+    setFilterVela("");
+    setFilterDay("");
+    setFilterHour("");
+  };
+
   const handleSavePreset = () => {
     const name = presetName.trim();
     if (!name) return;
-
     const newPreset: FilterPreset = {
       name,
       dateFrom: filterDateFromDraft,
@@ -515,1305 +1184,230 @@ export default function ChartsPage() {
       tf: filterTfDraft,
       side: filterSideDraft,
       session: filterSessionDraft,
+      emocion: filterEmocionDraft,
+      patron: filterPatronDraft,
+      vela: filterVelaDraft,
+      day: filterDayDraft,
+      hour: filterHourDraft,
     };
-
-    setPresets((prev) => {
-      const others = prev.filter((p) => p.name !== name);
-      return [...others, newPreset];
-    });
-
+    setPresets((prev) => [...prev.filter((p) => p.name !== name), newPreset]);
     setSelectedPresetName(name);
   };
 
   const handleLoadPreset = () => {
-    const name = selectedPresetName;
-    if (!name) return;
-
-    const preset = presets.find((p) => p.name === name);
-    if (!preset) return;
-
-    setFilterDateFromDraft(preset.dateFrom);
-    setFilterDateToDraft(preset.dateTo);
-    setFilterEaDraft(preset.ea);
-    setFilterSymbolDraft(preset.symbol);
-    setFilterTfDraft(preset.tf);
-    setFilterSideDraft(preset.side);
-    setFilterSessionDraft(preset.session);
-
-    setFilterDateFrom(preset.dateFrom);
-    setFilterDateTo(preset.dateTo);
-    setFilterEa(preset.ea);
-    setFilterSymbol(preset.symbol);
-    setFilterTf(preset.tf);
-    setFilterSide(preset.side);
-    setFilterSession(preset.session);
+    const p = presets.find((x) => x.name === selectedPresetName);
+    if (!p) return;
+    setFilterDateFromDraft(p.dateFrom);
+    setFilterDateToDraft(p.dateTo);
+    setFilterEaDraft(p.ea);
+    setFilterSymbolDraft(p.symbol);
+    setFilterTfDraft(p.tf);
+    setFilterSideDraft(p.side);
+    setFilterSessionDraft(p.session);
+    setFilterEmocionDraft(p.emocion || "");
+    setFilterPatronDraft(p.patron || "");
+    setFilterVelaDraft(p.vela || "");
+    setFilterDayDraft(p.day || "");
+    setFilterHourDraft(p.hour || "");
+    setFilterDateFrom(p.dateFrom);
+    setFilterDateTo(p.dateTo);
+    setFilterEa(p.ea);
+    setFilterSymbol(p.symbol);
+    setFilterTf(p.tf);
+    setFilterSide(p.side);
+    setFilterSession(p.session);
+    setFilterEmocion(p.emocion || "");
+    setFilterPatron(p.patron || "");
+    setFilterVela(p.vela || "");
+    setFilterDay(p.day || "");
+    setFilterHour(p.hour || "");
   };
 
-  // Visible trades según filtros globales
-  const visibleTrades = useMemo(() => {
-    let list = trades.slice();
-
-    if (filterDateFrom) {
-      const dFrom = new Date(filterDateFrom + "T00:00:00");
-      list = list.filter((t) => {
-        if (!t.dt_open_utc) return false;
-        const d = new Date(t.dt_open_utc);
-        return d >= dFrom;
-      });
-    }
-
-    if (filterDateTo) {
-      const dTo = new Date(filterDateTo + "T23:59:59");
-      list = list.filter((t) => {
-        if (!t.dt_open_utc) return false;
-        const d = new Date(t.dt_open_utc);
-        return d <= dTo;
-      });
-    }
-
-    if (filterEa) {
-      list = list.filter((t) => (t.ea || "").toUpperCase() === filterEa.toUpperCase());
-    }
-    if (filterSymbol) {
-      list = list.filter(
-        (t) => (t.symbol || "").toUpperCase() === filterSymbol.toUpperCase()
-      );
-    }
-    if (filterTf) {
-      list = list.filter(
-        (t) => (t.timeframe || "").toUpperCase() === filterTf.toUpperCase()
-      );
-    }
-    if (filterSide) {
-      list = list.filter(
-        (t) => (t.side || "").toUpperCase() === filterSide.toUpperCase()
-      );
-    }
-    if (filterSession) {
-      list = list.filter(
-        (t) => (t.session || "").toUpperCase() === filterSession.toUpperCase()
-      );
-    }
-
-    return list;
-  }, [
-    trades,
-    filterDateFrom,
-    filterDateTo,
-    filterEa,
-    filterSymbol,
-    filterTf,
-    filterSide,
-    filterSession,
-  ]);
-
-  /* ============================================================
-   * [BLOCK 1] Export CSV PRO – todas las columnas clave del trade
-   * ============================================================ */
   const handleExportCsv = () => {
     if (!visibleTrades.length) return;
-
-   const headers = [
-  "id",
-  "ticket",
-  "symbol",
-  "timeframe",
-  "session",
-  "dt_open_utc",
-  "dt_close_utc",
-  "side",
-  "volume",
-  "entry_price",
-  "exit_price",
-  "pips",
-  "rr_objetivo",
-  "pnl_usd_gross",
-  "pnl_usd_net",
-  "fee_usd",
-  "swap",
-  "close_reason",
-  "ea",
-  "ea_signal",
-  "ea_score",
-  "ea_tp1",
-  "ea_tp2",
-  "ea_tp3",
-  "ea_sl1",
-  "patron",
-  "vela",
-  "tendencia",
-  "emocion",
-  "notes",
-  ];
-
-
-
-
-    const escapeCell = (value: any) => {
-      if (value === null || value === undefined) return "";
-      const s = String(value);
-      if (s.includes('"') || s.includes(",") || s.includes("\n")) {
-        return `"${s.replace(/"/g, '""')}"`;
-      }
-      return s;
-    };
-
+    const headers = [
+      "id", "ticket", "symbol", "timeframe", "session", "dt_open_utc", "dt_close_utc", "side", "volume", "entry_price",
+      "exit_price", "pips", "rr_objetivo", "pnl_usd_gross", "pnl_usd_net", "fee_usd", "swap", "close_reason", "ea",
+      "ea_signal", "ea_score", "ea_tp1", "ea_tp2", "ea_tp3", "ea_sl1", "patron", "vela", "tendencia", "emocion", "notes",
+    ];
     const rows = visibleTrades.map((t) =>
       [
-        t.id,
-        t.ticket ?? "",
-        t.symbol ?? "",
-        t.timeframe ?? "",
-        t.session ?? "",
-        t.dt_open_utc ?? "",
-        t.dt_close_utc ?? "",
-        t.side ?? "",
-        t.volume ?? "",
-        t.entry_price ?? "",
-        t.exit_price ?? "",
-        t.pips ?? "",
-        t.rr_objetivo ?? "",
-        t.pnl_usd_gross ?? "",
-        t.pnl_usd_net ?? "",
-        t.fee_usd ?? "",
-        t.swap ?? "",
-        t.close_reason ?? "", // 👈 AQUÍ LO AGREGAMOS
-        t.ea ?? "",
-        t.ea_signal ?? "",
-        t.ea_score ?? "",
-        t.ea_tp1 ?? "",
-        t.ea_tp2 ?? "",
-        t.ea_tp3 ?? "",
-        t.ea_sl1 ?? "",
-        t.patron ?? "",
-        t.vela ?? "",
-        t.tendencia ?? "",
-        t.emocion ?? "",
-        t.notes ?? "",
-      ]
-        .map(escapeCell)
-        .join(",")
+        t.id, t.ticket, t.symbol, t.timeframe, t.session, t.dt_open_utc, t.dt_close_utc, t.side, t.volume, t.entry_price,
+        t.exit_price, t.pips, t.rr_objetivo, t.pnl_usd_gross, t.pnl_usd_net, t.fee_usd, t.swap, t.close_reason, t.ea,
+        t.ea_signal, t.ea_score, t.ea_tp1, t.ea_tp2, t.ea_tp3, t.ea_sl1, t.patron, t.vela, t.tendencia, t.emocion, t.notes,
+      ].map(csvEscape).join(",")
     );
-
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "bitlog_trades_export_pro.csv";
+    a.download = "bitlog_charts_filtrado.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  // Estadísticas globales
-  const summary = useMemo(() => {
-    const total = visibleTrades.length;
-    if (total === 0) {
-      return {
-        total,
-        wins: 0,
-        losses: 0,
-        winRate: 0,
-        pnl: 0,
-        avgPnL: 0,
-      };
-    }
-
-    let wins = 0;
-    let losses = 0;
-    let pnl = 0;
-
-    visibleTrades.forEach((t) => {
-      const v = safeNumber(t.pnl_usd_gross);
-      pnl += v;
-      if (v > 0) wins++;
-      else if (v < 0) losses++;
+  const toggleDynamicDim = (dim: DimensionKey) => {
+    setDynamicDims((prev) => {
+      if (prev.includes(dim)) return prev.length === 1 ? prev : prev.filter((d) => d !== dim);
+      return [...prev, dim];
     });
-
-    const winRate = total > 0 ? (wins / total) * 100 : 0;
-    const avgPnL = total > 0 ? pnl / total : 0;
-
-    return { total, wins, losses, winRate, pnl, avgPnL };
-  }, [visibleTrades]);
-
-  // Duración promedio de trades (cerrados)
-  const avgDurationMs = useMemo(() => {
-    let totalMs = 0;
-    let count = 0;
-    visibleTrades.forEach((t) => {
-      if (!t.dt_open_utc || !t.dt_close_utc) return;
-      const dOpen = new Date(t.dt_open_utc);
-      const dClose = new Date(t.dt_close_utc);
-      if (Number.isNaN(dOpen.getTime()) || Number.isNaN(dClose.getTime())) return;
-      const diff = dClose.getTime() - dOpen.getTime();
-      if (diff > 0) {
-        totalMs += diff;
-        count++;
-      }
-    });
-    if (count === 0) return 0;
-    return totalMs / count;
-  }, [visibleTrades]);
-
-  // Performance por EA, símbolo, timeframe
-  const perfByEA = useMemo<PerfRow[]>(() => {
-    const map = new Map<string, { trades: number; wins: number; losses: number; pnl: number }>();
-
-    visibleTrades.forEach((t) => {
-      const key = (t.ea || "SIN_EA").trim() || "SIN_EA";
-      if (!map.has(key)) {
-        map.set(key, { trades: 0, wins: 0, losses: 0, pnl: 0 });
-      }
-      const rec = map.get(key)!;
-      rec.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: PerfRow[] = [];
-    map.forEach((v, k) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        key: k,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    rows.sort((a, b) => b.trades - a.trades);
-    return rows;
-  }, [visibleTrades]);
-
-  const perfBySymbol = useMemo<PerfRow[]>(() => {
-    const map = new Map<string, { trades: number; wins: number; losses: number; pnl: number }>();
-
-    visibleTrades.forEach((t) => {
-      const key = (t.symbol || "SIN_SYMBOL").trim() || "SIN_SYMBOL";
-      if (!map.has(key)) {
-        map.set(key, { trades: 0, wins: 0, losses: 0, pnl: 0 });
-      }
-      const rec = map.get(key)!;
-      rec.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: PerfRow[] = [];
-    map.forEach((v, k) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        key: k,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    rows.sort((a, b) => b.trades - a.trades);
-    return rows;
-  }, [visibleTrades]);
-
-  const perfByTimeframe = useMemo<PerfRow[]>(() => {
-    const map = new Map<string, { trades: number; wins: number; losses: number; pnl: number }>();
-
-    visibleTrades.forEach((t) => {
-      const key = (t.timeframe || "SIN_TF").trim() || "SIN_TF";
-      if (!map.has(key)) {
-        map.set(key, { trades: 0, wins: 0, losses: 0, pnl: 0 });
-      }
-      const rec = map.get(key)!;
-      rec.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: PerfRow[] = [];
-    map.forEach((v, k) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        key: k,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    rows.sort((a, b) => b.trades - a.trades);
-    return rows;
-  }, [visibleTrades]);
-
-  // Performance por día de la semana
-  const perfByDayOfWeek = useMemo<DayOfWeekRow[]>(() => {
-    const base: DayOfWeekRow[] = [
-      { dayIndex: 0, label: "Domingo", trades: 0, wins: 0, losses: 0, winRate: 0, pnl: 0 },
-      { dayIndex: 1, label: "Lunes", trades: 0, wins: 0, losses: 0, winRate: 0, pnl: 0 },
-      { dayIndex: 2, label: "Martes", trades: 0, wins: 0, losses: 0, winRate: 0, pnl: 0 },
-      { dayIndex: 3, label: "Miércoles", trades: 0, wins: 0, losses: 0, winRate: 0, pnl: 0 },
-      { dayIndex: 4, label: "Jueves", trades: 0, wins: 0, losses: 0, winRate: 0, pnl: 0 },
-      { dayIndex: 5, label: "Viernes", trades: 0, wins: 0, losses: 0, winRate: 0, pnl: 0 },
-      { dayIndex: 6, label: "Sábado", trades: 0, wins: 0, losses: 0, winRate: 0, pnl: 0 },
-    ];
-
-    visibleTrades.forEach((t) => {
-      if (!t.dt_open_utc) return;
-      const d = new Date(t.dt_open_utc);
-      if (Number.isNaN(d.getTime())) return;
-      const idx = d.getDay(); // 0-6
-      const row = base[idx];
-      row.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      row.pnl += v;
-      if (v > 0) row.wins += 1;
-      else if (v < 0) row.losses += 1;
-    });
-
-    base.forEach((r) => {
-      r.winRate = r.trades > 0 ? (r.wins / r.trades) * 100 : 0;
-    });
-
-    // Orden: Lunes a Domingo
-    const order = [1, 2, 3, 4, 5, 6, 0];
-    return order.map((i) => base[i]);
-  }, [visibleTrades]);
-
-  // Performance por hora del día (Mazatlán)
-  const perfByHourOfDay = useMemo<HourOfDayRow[]>(() => {
-    const base: HourOfDayRow[] = [];
-    for (let h = 0; h < 24; h++) {
-      base.push({
-        hour: h,
-        label: `${String(h).padStart(2, "0")}:00`,
-        trades: 0,
-        wins: 0,
-        losses: 0,
-        winRate: 0,
-        pnl: 0,
-      });
-    }
-
-    visibleTrades.forEach((t) => {
-      if (!t.dt_open_utc) return;
-      const hour = getHourMazatlan(t.dt_open_utc);
-      const row = base[hour] ?? base[0];
-      row.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      row.pnl += v;
-      if (v > 0) row.wins += 1;
-      else if (v < 0) row.losses += 1;
-    });
-
-    base.forEach((r) => {
-      r.winRate = r.trades > 0 ? (r.wins / r.trades) * 100 : 0;
-    });
-
-    return base;
-  }, [visibleTrades]);
-  
-    // Confluencias EA + Símbolo + TF (combo base)
-  const combosEA_Symbol_TF = useMemo<ComboRow[]>(() => {
-    const map = new Map<
-      string,
-      {
-        ea: string;
-        symbol: string;
-        timeframe: string;
-        trades: number;
-        wins: number;
-        losses: number;
-        pnl: number;
-      }
-    >();
-
-    visibleTrades.forEach((t) => {
-      const ea = (t.ea || "SIN_EA").trim() || "SIN_EA";
-      const symbol = (t.symbol || "SIN_SYMBOL").trim() || "SIN_SYMBOL";
-      const tf = (t.timeframe || "SIN_TF").trim() || "SIN_TF";
-
-      // Si falta EA / símbolo / TF, no tiene sentido como combo
-      if (!ea || !symbol || !tf) return;
-
-      const key = `${ea}__${symbol}__${tf}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          ea,
-          symbol,
-          timeframe: tf,
-          trades: 0,
-          wins: 0,
-          losses: 0,
-          pnl: 0,
-        });
-      }
-
-      const rec = map.get(key)!;
-      rec.trades += 1;
-
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: ComboRow[] = [];
-    map.forEach((v) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        ea: v.ea,
-        symbol: v.symbol,
-        timeframe: v.timeframe,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    // Orden principal: más trades primero
-    rows.sort((a, b) => b.trades - a.trades);
-    return rows;
-  }, [visibleTrades]);
-
-  
-  
-   // Desglose por motivo de cierre (4 tipos: TP / SL / USER / NULL)
-  const perfByCloseReason = useMemo<CloseReasonRow[]>(() => {
-    const map = new Map<
-      string,
-      { trades: number; wins: number; losses: number; pnl: number }
-    >();
-
-    visibleTrades.forEach((t) => {
-      // Queremos distinguir claramente:
-      // - TP   -> TP
-      // - SL   -> SL
-      // - USER -> USER (incluye: USER, OTHER, MANUAL, user, other...)
-      // - NULL -> cuando NO hay close_reason (null, vacío, solo espacios)
-      const raw = (t.close_reason || "").trim().toUpperCase();
-
-      let reason: string;
-
-      if (!raw) {
-        // Sin valor → trade creado a mano, aún sin CSV del broker
-        reason = "NULL";
-      } else if (raw === "TP") {
-        reason = "TP";
-      } else if (raw === "SL") {
-        reason = "SL";
-      } else if (raw === "USER" || raw === "OTHER" || raw === "MANUAL") {
-        // Todo lo que signifique "cerré yo" lo agrupamos como USER
-        reason = "USER";
-      } else {
-        // Cualquier otro texto raro, lo mandamos a USER para no perderlo
-        reason = "USER";
-      }
-
-      if (!map.has(reason)) {
-        map.set(reason, { trades: 0, wins: 0, losses: 0, pnl: 0 });
-      }
-
-      const rec = map.get(reason)!;
-      rec.trades += 1;
-
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: CloseReasonRow[] = [];
-    map.forEach((v, k) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        reason: k,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    // Orden: TP, SL, USER, NULL
-    const order = ["TP", "SL", "USER", "NULL"];
-    rows.sort((a, b) => {
-      const ia = order.indexOf(a.reason);
-      const ib = order.indexOf(b.reason);
-      const na = ia === -1 ? 999 : ia;
-      const nb = ib === -1 ? 999 : ib;
-      if (na !== nb) return na - nb;
-      return b.trades - a.trades;
-    });
-
-    return rows;
-  }, [visibleTrades]);
-
- 
- 
-
-  // Top confluencias (modo sniper)
-  const topSniperCombos = useMemo(() => {
-    const minTrades = 5;
-    const filtered = combosEA_Symbol_TF.filter((c) => c.trades >= minTrades);
-    filtered.sort((a, b) => {
-      if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-      return b.trades - a.trades;
-    });
-    return filtered.slice(0, 10);
-  }, [combosEA_Symbol_TF]);
-
-  // Datos para gráficas
-  const chartDataSymbolPnL = useMemo(
-    () =>
-      perfBySymbol.map((row) => ({
-        symbol: row.key,
-        pnl: row.pnl,
-        trades: row.trades,
-      })),
-    [perfBySymbol]
-  );
-
-  const pieWinLossData = useMemo(
-    () => [
-      { name: "Wins", value: summary.wins },
-      { name: "Losses", value: summary.losses },
-      {
-        name: "Neutros",
-        value: Math.max(summary.total - summary.wins - summary.losses, 0),
-      },
-    ],
-    [summary]
-  );
-
-  const PIE_COLORS = ["#4caf50", "#f44336", "#757575"];
-
-  // Heatmap EA × timeframe
-  const heatmapEA_TF = useMemo(() => {
-    const cellMap = new Map<
-      string,
-      { ea: string; timeframe: string; trades: number; wins: number; winRate: number }
-    >();
-    const eaSet = new Set<string>();
-    const tfSet = new Set<string>();
-
-    visibleTrades.forEach((t) => {
-      if (!t.ea || !t.timeframe) return;
-      const ea = t.ea.trim();
-      const timeframe = t.timeframe.trim();
-      const key = `${ea}__${timeframe}`;
-      if (!cellMap.has(key)) {
-        cellMap.set(key, { ea, timeframe, trades: 0, wins: 0, winRate: 0 });
-      }
-      const cell = cellMap.get(key)!;
-      cell.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      if (v > 0) cell.wins += 1;
-
-      eaSet.add(ea);
-      tfSet.add(timeframe);
-    });
-
-    cellMap.forEach((cell) => {
-      cell.winRate = cell.trades > 0 ? (cell.wins / cell.trades) * 100 : 0;
-    });
-
-    const eas = Array.from(eaSet).sort();
-    const timeframes = Array.from(tfSet).sort();
-
-    return { cellMap, eas, timeframes };
-  }, [visibleTrades]);
-
-  // Confluencias avanzadas
-  const confEA_Symbol_TF_Patron = useMemo<ConfluenceRow[]>(() => {
-    const map = new Map<
-      string,
-      {
-        ea: string;
-        symbol: string;
-        timeframe: string;
-        extra: string;
-        trades: number;
-        wins: number;
-        losses: number;
-        pnl: number;
-      }
-    >();
-
-    visibleTrades.forEach((t) => {
-      if (!t.patron) return;
-      const ea = (t.ea || "SIN_EA").trim() || "SIN_EA";
-      const symbol = (t.symbol || "SIN_SYMBOL").trim() || "SIN_SYMBOL";
-      const tf = (t.timeframe || "SIN_TF").trim() || "SIN_TF";
-      const extra = t.patron.trim();
-      const key = `${ea}__${symbol}__${tf}__${extra}`;
-      if (!map.has(key)) {
-        map.set(key, { ea, symbol, timeframe: tf, extra, trades: 0, wins: 0, losses: 0, pnl: 0 });
-      }
-      const rec = map.get(key)!;
-      rec.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: ConfluenceRow[] = [];
-    map.forEach((v) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        ea: v.ea,
-        symbol: v.symbol,
-        timeframe: v.timeframe,
-        extra: v.extra,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    rows.sort((a, b) => b.trades - a.trades);
-    return rows;
-  }, [visibleTrades]);
-
-  const confEA_Symbol_TF_Vela = useMemo<ConfluenceRow[]>(() => {
-    const map = new Map<
-      string,
-      {
-        ea: string;
-        symbol: string;
-        timeframe: string;
-        extra: string;
-        trades: number;
-        wins: number;
-        losses: number;
-        pnl: number;
-      }
-    >();
-
-    visibleTrades.forEach((t) => {
-      if (!t.vela) return;
-      const ea = (t.ea || "SIN_EA").trim() || "SIN_EA";
-      const symbol = (t.symbol || "SIN_SYMBOL").trim() || "SIN_SYMBOL";
-      const tf = (t.timeframe || "SIN_TF").trim() || "SIN_TF";
-      const extra = t.vela.trim();
-      const key = `${ea}__${symbol}__${tf}__${extra}`;
-      if (!map.has(key)) {
-        map.set(key, { ea, symbol, timeframe: tf, extra, trades: 0, wins: 0, losses: 0, pnl: 0 });
-      }
-      const rec = map.get(key)!;
-      rec.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: ConfluenceRow[] = [];
-    map.forEach((v) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        ea: v.ea,
-        symbol: v.symbol,
-        timeframe: v.timeframe,
-        extra: v.extra,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    rows.sort((a, b) => b.trades - a.trades);
-    return rows;
-  }, [visibleTrades]);
-
-  const confEA_Symbol_TF_Emocion = useMemo<ConfluenceRow[]>(() => {
-    const map = new Map<
-      string,
-      {
-        ea: string;
-        symbol: string;
-        timeframe: string;
-        extra: string;
-        trades: number;
-        wins: number;
-        losses: number;
-        pnl: number;
-      }
-    >();
-
-    visibleTrades.forEach((t) => {
-      if (!t.emocion) return;
-      const ea = (t.ea || "SIN_EA").trim() || "SIN_EA";
-      const symbol = (t.symbol || "SIN_SYMBOL").trim() || "SIN_SYMBOL";
-      const tf = (t.timeframe || "SIN_TF").trim() || "SIN_TF";
-      const extra = t.emocion.trim();
-      const key = `${ea}__${symbol}__${tf}__${extra}`;
-      if (!map.has(key)) {
-        map.set(key, { ea, symbol, timeframe: tf, extra, trades: 0, wins: 0, losses: 0, pnl: 0 });
-      }
-      const rec = map.get(key)!;
-      rec.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: ConfluenceRow[] = [];
-    map.forEach((v) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        ea: v.ea,
-        symbol: v.symbol,
-        timeframe: v.timeframe,
-        extra: v.extra,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    rows.sort((a, b) => b.trades - a.trades);
-    return rows;
-  }, [visibleTrades]);
-
-  const confEA_Symbol_TF_Session = useMemo<ConfluenceRow[]>(() => {
-    const map = new Map<
-      string,
-      {
-        ea: string;
-        symbol: string;
-        timeframe: string;
-        extra: string;
-        trades: number;
-        wins: number;
-        losses: number;
-        pnl: number;
-      }
-    >();
-
-    visibleTrades.forEach((t) => {
-      if (!t.session) return;
-      const ea = (t.ea || "SIN_EA").trim() || "SIN_EA";
-      const symbol = (t.symbol || "SIN_SYMBOL").trim() || "SIN_SYMBOL";
-      const tf = (t.timeframe || "SIN_TF").trim() || "SIN_TF";
-      const extra = t.session.trim();
-      const key = `${ea}__${symbol}__${tf}__${extra}`;
-      if (!map.has(key)) {
-        map.set(key, { ea, symbol, timeframe: tf, extra, trades: 0, wins: 0, losses: 0, pnl: 0 });
-      }
-      const rec = map.get(key)!;
-      rec.trades += 1;
-      const v = safeNumber(t.pnl_usd_gross);
-      rec.pnl += v;
-      if (v > 0) rec.wins += 1;
-      else if (v < 0) rec.losses += 1;
-    });
-
-    const rows: ConfluenceRow[] = [];
-    map.forEach((v) => {
-      const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-      rows.push({
-        ea: v.ea,
-        symbol: v.symbol,
-        timeframe: v.timeframe,
-        extra: v.extra,
-        trades: v.trades,
-        wins: v.wins,
-        losses: v.losses,
-        winRate,
-        pnl: v.pnl,
-      });
-    });
-
-    rows.sort((a, b) => b.trades - a.trades);
-    return rows;
-  }, [visibleTrades]);
-
-  // Filtro de confluencias (sobre visibleTrades)
-  const confFilteredTrades = useMemo(() => {
-    if (!confFiltersApplied) return [];
-
-    let list = visibleTrades.slice();
-
-    if (confEa) {
-      list = list.filter((t) => (t.ea || "").toUpperCase() === confEa.toUpperCase());
-    }
-    if (confSymbol) {
-      list = list.filter(
-        (t) => (t.symbol || "").toUpperCase() === confSymbol.toUpperCase()
-      );
-    }
-    if (confTf) {
-      list = list.filter(
-        (t) => (t.timeframe || "").toUpperCase() === confTf.toUpperCase()
-      );
-    }
-    if (confSession) {
-      list = list.filter(
-        (t) => (t.session || "").toUpperCase() === confSession.toUpperCase()
-      );
-    }
-    if (confEmocion) {
-      list = list.filter(
-        (t) => (t.emocion || "").toUpperCase() === confEmocion.toUpperCase()
-      );
-    }
-    if (confPatron) {
-      list = list.filter(
-        (t) => (t.patron || "").toUpperCase() === confPatron.toUpperCase()
-      );
-    }
-    if (confVela) {
-      list = list.filter((t) => (t.vela || "").toUpperCase() === confVela.toUpperCase());
-    }
-
-    return list;
-  }, [
-    visibleTrades,
-    confEa,
-    confSymbol,
-    confTf,
-    confSession,
-    confEmocion,
-    confPatron,
-    confVela,
-    confFiltersApplied,
-  ]);
-
-  const confSummary = useMemo(() => {
-    const total = confFilteredTrades.length;
-    if (total === 0) {
-      return { total, wins: 0, losses: 0, winRate: 0, pnl: 0 };
-    }
-    let wins = 0;
-    let losses = 0;
-    let pnl = 0;
-    confFilteredTrades.forEach((t) => {
-      const v = safeNumber(t.pnl_usd_gross);
-      pnl += v;
-      if (v > 0) wins++;
-      else if (v < 0) losses++;
-    });
-    const winRate = total > 0 ? (wins / total) * 100 : 0;
-    return { total, wins, losses, winRate, pnl };
-  }, [confFilteredTrades]);
-
-  const applyConfluenceFilters = () => {
-    setConfFiltersApplied(true);
   };
 
-  const clearConfluenceFilters = () => {
-    setConfEa("");
-    setConfSymbol("");
-    setConfTf("");
-    setConfSession("");
-    setConfEmocion("");
-    setConfPatron("");
-    setConfVela("");
-    setConfFiltersApplied(false);
+  const chartMetricLabel = dynamicMetric === "pnl" ? "PnL" : dynamicMetric === "winRate" ? "Win%" : "Trades";
+  const chartMetricFormatter = (value: any) =>
+    dynamicMetric === "pnl" ? fmtMoney(Number(value)) : dynamicMetric === "winRate" ? fmtPct(Number(value)) : Number(value);
+  const chartRows = dynamicConfluence.filter((r) => r.trades >= minTrades).slice(0, 12).map((r) => ({ ...r, metric: r[dynamicMetric] }));
+  const dynamicChartHeight = Math.max(320, chartRows.length * 42);
+
+  const renderButtonStyle: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 10px", fontSize: 12, borderRadius: 0, minWidth: 0, width: "auto" };
+
+  const renderMiniChart = (title: string, rows: PerfRow[], metric: MetricKey = "pnl") => {
+    const data = rows.filter((r) => r.trades >= minTrades).slice(0, 8).map((r) => ({ ...r, metric: r[metric] }));
+    return (
+      <div style={CARD_STYLE}>
+        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>{title}</h2>
+        {data.length === 0 ? (
+          <p style={{ fontSize: 12, opacity: 0.8 }}>Sin datos suficientes.</p>
+        ) : (
+          <div style={{ width: "100%", height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                <XAxis dataKey="key" stroke={AXIS} tick={{ fontSize: 11 }} interval={0} />
+                <YAxis stroke={AXIS} />
+                <Tooltip content={<MiniChartTooltipContent />} />
+                <Bar dataKey="metric" name={metric === "pnl" ? "PnL" : metric === "winRate" ? "Win%" : "Trades"} radius={[6, 6, 0, 0]}>
+                  {data.map((entry) => (
+                    <Cell key={entry.key} fill={Number(entry.metric) >= 0 ? GREEN : RED} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    );
   };
-
-  // Winrate por EA (para bloque pequeño)
-  const winrateByEAOnly = useMemo(
-    () =>
-      perfByEA.map((row) => ({
-        ea: row.key,
-        winRate: row.winRate,
-        trades: row.trades,
-      })),
-    [perfByEA]
-  );
-
-  // PnL por símbolo (para bloque pequeño)
-  const pnlBySymbolOnly = useMemo(
-    () =>
-      perfBySymbol.map((row) => ({
-        symbol: row.key,
-        pnl: row.pnl,
-        trades: row.trades,
-      })),
-    [perfBySymbol]
-  );
 
   return (
     <div className="container" style={{ paddingBottom: 40 }}>
       <TopNav />
 
-      {/* Header Estadísticas & Confluencias */}
       <div style={CARD_STYLE}>
         <h1 className="title" style={{ marginTop: 0, marginBottom: 8 }}>
-          Estadísticas &amp; Confluencias
+          Charts — Dashboard &amp; Confluencias
         </h1>
         <p style={{ margin: 0, opacity: 0.8, fontSize: 13, marginBottom: 8 }}>
-          Lectura 100% en frontend. No se modifica la BD — solo analizamos tus trades.
+          Gráficas modernas rojo/verde, diagnóstico por categoría, confluencias fijas y generador dinámico on demand.
         </p>
-
-        {/* Menú de acciones: Aplicar | Limpiar | Exportar + presets rápidos */}
-        <div
-          style={{
-            fontSize: 13,
-            marginTop: 8,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flexWrap: "nowrap",
-          }}
-        >
-          <button
-            type="button"
-            className="btn"
-            onClick={handleApplyGlobalFilters}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 10px",
-              fontSize: 12,
-              borderRadius: 0,
-              minWidth: 0,
-              width: "auto",
-            }}
-          >
-            Aplicar filtros
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={handleClearGlobalFilters}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 10px",
-              fontSize: 12,
-              borderRadius: 0,
-              minWidth: 0,
-              width: "auto",
-            }}
-          >
-            Limpiar filtros
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={handleExportCsv}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 10px",
-              fontSize: 12,
-              borderRadius: 0,
-              minWidth: 0,
-              width: "auto",
-            }}
-          >
-            Exportar CSV filtrados
-          </button>
-
-          {/* Presets rápidos */}
-          <button
-            type="button"
-            className="btn"
-            onClick={() => applyQuickPreset("today")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 10px",
-              fontSize: 12,
-              borderRadius: 0,
-              minWidth: 0,
-              width: "auto",
-              marginLeft: 8,
-            }}
-          >
-            Hoy
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => applyQuickPreset("7d")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 10px",
-              fontSize: 12,
-              borderRadius: 0,
-              minWidth: 0,
-              width: "auto",
-            }}
-          >
-            Últimos 7 días
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => applyQuickPreset("30d")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 10px",
-              fontSize: 12,
-              borderRadius: 0,
-              minWidth: 0,
-              width: "auto",
-            }}
-          >
-            Últimos 30 días
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => applyQuickPreset("ny")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px 10px",
-              fontSize: 12,
-              borderRadius: 0,
-              minWidth: 0,
-              width: "auto",
-            }}
-          >
-            Solo NY Session
-          </button>
+        <div style={{ fontSize: 13, marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" className="btn" onClick={handleApplyGlobalFilters} style={renderButtonStyle}>Aplicar filtros</button>
+          <button type="button" className="btn" onClick={handleClearGlobalFilters} style={renderButtonStyle}>Limpiar filtros</button>
+          <button type="button" className="btn" onClick={handleExportCsv} style={renderButtonStyle}>Exportar CSV filtrados</button>
+          <button type="button" className="btn" onClick={() => applyQuickPreset("today")} style={renderButtonStyle}>Hoy</button>
+          <button type="button" className="btn" onClick={() => applyQuickPreset("7d")} style={renderButtonStyle}>Últimos 7 días</button>
+          <button type="button" className="btn" onClick={() => applyQuickPreset("30d")} style={renderButtonStyle}>Últimos 30 días</button>
+          <button type="button" className="btn" onClick={() => applyQuickPreset("ny")} style={renderButtonStyle}>Solo NY Session</button>
         </div>
-
-        {/* Winrate global destacado */}
         <div style={{ marginTop: 12 }}>
-          <span
-            style={{
-              ...BADGE_STYLE_BASE,
-              backgroundColor: summary.winRate >= 60 ? "#1b5e20" : "#37474f",
-              color: "#fff",
-            }}
-          >
+          <span style={{ ...BADGE_STYLE_BASE, backgroundColor: summary.winRate >= 60 ? "#166534" : summary.winRate >= 50 ? "#374151" : "#991b1b", color: "#fff" }}>
             Winrate global: {fmtPct(summary.winRate)}
           </span>
         </div>
       </div>
 
-      {/* Filtros globales */}
       <div style={CARD_STYLE}>
         <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>Filtros globales</h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-            gap: 12,
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12 }}>
           <div className="field">
-            <div className="label">Desde (fecha)</div>
-            <input
-              className="input"
-              type="date"
-              value={filterDateFromDraft}
-              onChange={(e) => setFilterDateFromDraft(e.target.value)}
-            />
+            <div className="label">Desde</div>
+            <input className="input" type="date" value={filterDateFromDraft} onChange={(e) => setFilterDateFromDraft(e.target.value)} />
           </div>
           <div className="field">
-            <div className="label">Hasta (fecha)</div>
-            <input
-              className="input"
-              type="date"
-              value={filterDateToDraft}
-              onChange={(e) => setFilterDateToDraft(e.target.value)}
-            />
+            <div className="label">Hasta</div>
+            <input className="input" type="date" value={filterDateToDraft} onChange={(e) => setFilterDateToDraft(e.target.value)} />
           </div>
+          <FilterDropdown label="EA" value={filterEaDraft} options={allEAs} onChange={setFilterEaDraft} />
+          <FilterDropdown label="Símbolo" value={filterSymbolDraft} options={allSymbols} onChange={setFilterSymbolDraft} />
+          <FilterDropdown label="Timeframe" value={filterTfDraft} options={allTimeframes} onChange={setFilterTfDraft} />
+          <FilterDropdown label="Dirección" value={filterSideDraft} options={["BUY", "SELL"]} onChange={setFilterSideDraft} placeholder="(Todas)" />
+          <FilterDropdown label="Sesión" value={filterSessionDraft} options={allSessions} onChange={setFilterSessionDraft} placeholder="(Todas)" />
+          <FilterDropdown label="Emoción" value={filterEmocionDraft} options={allEmociones} onChange={setFilterEmocionDraft} placeholder="(Todas)" />
+          <FilterDropdown label="Patrón" value={filterPatronDraft} options={allPatrones} onChange={setFilterPatronDraft} placeholder="(Todos)" />
+          <FilterDropdown label="Vela" value={filterVelaDraft} options={allVelas} onChange={setFilterVelaDraft} placeholder="(Todas)" />
+          <FilterDropdown label="Día" value={filterDayDraft} options={allDays} onChange={setFilterDayDraft} placeholder="(Todos)" />
+          <FilterDropdown label="Hora" value={filterHourDraft} options={allHours} onChange={setFilterHourDraft} placeholder="(Todas)" />
+          
           <div className="field">
-            <div className="label">EA</div>
-            <select
-              className="input"
-              value={filterEaDraft}
-              onChange={(e) => setFilterEaDraft(e.target.value)}
-            >
-              <option value="">(Todos)</option>
-              {allEAs.map((ea) => (
-                <option key={ea} value={ea}>
-                  {ea}
-                </option>
-              ))}
+            <div className="label">Mínimo de trades</div>
+            <select className="input" value={minTrades} onChange={(e) => setMinTrades(Number(e.target.value))}>
+              <option value={1}>1</option>
+              <option value={3}>3</option>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={300}>300</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
             </select>
           </div>
-          <div className="field">
-            <div className="label">Símbolo</div>
-            <select
-              className="input"
-              value={filterSymbolDraft}
-              onChange={(e) => setFilterSymbolDraft(e.target.value)}
-            >
-              <option value="">(Todos)</option>
-              {allSymbols.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <div className="label">Timeframe</div>
-            <select
-              className="input"
-              value={filterTfDraft}
-              onChange={(e) => setFilterTfDraft(e.target.value)}
-            >
-              <option value="">(Todos)</option>
-              {allTimeframes.map((tf) => (
-                <option key={tf} value={tf}>
-                  {tf}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <div className="label">Lado</div>
-            <select
-              className="input"
-              value={filterSideDraft}
-              onChange={(e) => setFilterSideDraft(e.target.value)}
-            >
-              <option value="">(Todos)</option>
-              <option value="BUY">BUY</option>
-              <option value="SELL">SELL</option>
-            </select>
-          </div>
-          <div className="field">
-            <div className="label">Sesión</div>
-            <select
-              className="input"
-              value={filterSessionDraft}
-              onChange={(e) => setFilterSessionDraft(e.target.value)}
-            >
-              <option value="">(Todas)</option>
-              {allSessions.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
 
-        {/* Presets favoritos */}
-        <div
-          style={{
-            marginTop: 12,
-            display: "grid",
-            gridTemplateColumns: "minmax(200px,2fr) minmax(200px,2fr)",
-            gap: 12,
-          }}
-        >
-          <div>
+          <div className="field">
             <div className="label">Nombre de preset</div>
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-              }}
-            >
-              <input
-                className="input"
-                type="text"
-                value={presetName}
-                onChange={(e) => setPresetName(e.target.value)}
-                placeholder="Setup EMA-Wave M5"
-              />
-              <button
-                type="button"
-                className="btn"
-                onClick={handleSavePreset}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "4px 10px",
-                  fontSize: 12,
-                  borderRadius: 0,
-                  minWidth: 0,
-                  width: "auto",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Guardar preset
-              </button>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input className="input" type="text" value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Setup XAU M15" />
+              <button type="button" className="btn" onClick={handleSavePreset} style={renderButtonStyle}>Guardar preset</button>
             </div>
           </div>
-          <div>
+
+          <div className="field">
             <div className="label">Presets guardados</div>
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-              }}
-            >
-              <select
-                className="input"
-                value={selectedPresetName}
-                onChange={(e) => setSelectedPresetName(e.target.value)}
-              >
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <select className="input" value={selectedPresetName} onChange={(e) => setSelectedPresetName(e.target.value)}>
                 <option value="">(Ninguno)</option>
-                {presets
-                  .slice()
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((p) => (
-                    <option key={p.name} value={p.name}>
-                      {p.name}
-                    </option>
-                  ))}
+                {presets.slice().sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
+                  <option key={p.name} value={p.name}>{p.name}</option>
+                ))}
               </select>
-              <button
-                type="button"
-                className="btn"
-                onClick={handleLoadPreset}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "4px 10px",
-                  fontSize: 12,
-                  borderRadius: 0,
-                  minWidth: 0,
-                  width: "auto",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Cargar preset
-              </button>
+              <button type="button" className="btn" onClick={handleLoadPreset} style={renderButtonStyle}>Cargar preset</button>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Resumen global + bloques pequeños */}
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+        
+        
+        
+        
+        
+        
+        
+        
+        
+      </div>   
       <div style={CARD_STYLE}>
         <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>Resumen global</h2>
         {loading ? (
@@ -1822,375 +1416,55 @@ export default function ChartsPage() {
           <p style={{ color: "#f88" }}>{error}</p>
         ) : (
           <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
-                gap: 12,
-                marginBottom: 12,
-              }}
-            >
-              <div>
-                <div className="label">Trades (filtrados)</div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{summary.total}</div>
-              </div>
-              <div>
-                <div className="label">Wins</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#4caf50" }}>
-                  {summary.wins}
-                </div>
-              </div>
-              <div>
-                <div className="label">Losses</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#f44336" }}>
-                  {summary.losses}
-                </div>
-              </div>
-              <div>
-                <div className="label">Win rate</div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtPct(summary.winRate)}</div>
-              </div>
-              <div>
-                <div className="label">PnL total</div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtMoney(summary.pnl)}</div>
-              </div>
-              <div>
-                <div className="label">PnL promedio</div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>
-                  {fmtMoney(summary.avgPnL)}
-                </div>
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginBottom: 12 }}>
+              <div><div className="label">Trades</div><div style={{ fontSize: 18, fontWeight: 700 }}>{summary.total}</div></div>
+              <div><div className="label">Wins</div><div style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{summary.wins}</div></div>
+              <div><div className="label">Losses</div><div style={{ fontSize: 18, fontWeight: 700, color: RED }}>{summary.losses}</div></div>
+              <div><div className="label">Win rate</div><div style={{ fontSize: 18, fontWeight: 700 }}>{fmtPct(summary.winRate)}</div></div>
+              <div><div className="label">PnL total</div><div style={{ fontSize: 18, fontWeight: 700, color: summary.pnl > 0 ? GREEN : summary.pnl < 0 ? RED : "#ccc" }}>{fmtMoney(summary.pnl)}</div></div>
+              <div><div className="label">PnL promedio</div><div style={{ fontSize: 18, fontWeight: 700 }}>{fmtMoney(summary.avgPnL)}</div></div>
+              <div><div className="label">Duración promedio</div><div style={{ fontSize: 18, fontWeight: 700 }}>{formatDurationHMS(avgDurationMs)}</div></div>
             </div>
-
-            {/* Top confluencias (sniper) + Winrate por EA + PnL por símbolo */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(220px,2.2fr) minmax(160px,1.4fr) minmax(160px,1.4fr)",
-                gap: 16,
-              }}
-            >
-              {/* Top confluencias modo sniper */}
-              <div>
-                <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 14 }}>
-                  Top confluencias (modo sniper)
-                </h3>
-                <table style={TABLE_STYLE}>
-                  <thead>
-                    <tr>
-                      <th style={TH_STYLE}>EA</th>
-                      <th style={TH_STYLE}>Símbolo</th>
-                      <th style={TH_STYLE}>TF</th>
-                      <th style={TH_STYLE}>Trades</th>
-                      <th style={TH_STYLE}>Win%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topSniperCombos.map((c, idx) => {
-                      const rowStyle: React.CSSProperties = {
-                        ...TD_STYLE_BASE,
-                        backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                      };
-                      return (
-                        <tr key={`${c.ea}__${c.symbol}__${c.timeframe}`}>
-                          <td style={rowStyle}>{c.ea}</td>
-                          <td style={rowStyle}>{c.symbol}</td>
-                          <td style={rowStyle}>{c.timeframe}</td>
-                          <td style={rowStyle}>{c.trades}</td>
-                          <td style={rowStyle}>{fmtPct(c.winRate)}</td>
-                        </tr>
-                      );
-                    })}
-                    {topSniperCombos.length === 0 && (
-                      <tr>
-                        <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={5}>
-                          Aún no hay suficientes trades por combo (mínimo 5).
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Winrate por EA */}
-              <div>
-                <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 14 }}>Winrate por EA</h3>
-                <table style={TABLE_STYLE}>
-                  <thead>
-                    <tr>
-                      <th style={TH_STYLE}>EA</th>
-                      <th style={TH_STYLE}>Trades</th>
-                      <th style={TH_STYLE}>Win%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {winrateByEAOnly.map((row, idx) => {
-                      const rowStyle: React.CSSProperties = {
-                        ...TD_STYLE_BASE,
-                        backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                      };
-                      return (
-                        <tr key={row.ea}>
-                          <td style={rowStyle}>{row.ea}</td>
-                          <td style={rowStyle}>{row.trades}</td>
-                          <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                        </tr>
-                      );
-                    })}
-                    {winrateByEAOnly.length === 0 && (
-                      <tr>
-                        <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={3}>
-                          Sin datos.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* P&L por símbolo */}
-              <div>
-                <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 14 }}>
-                  P&amp;L por símbolo (USD)
-                </h3>
-                <table style={TABLE_STYLE}>
-                  <thead>
-                    <tr>
-                      <th style={TH_STYLE}>Símbolo</th>
-                      <th style={TH_STYLE}>Trades</th>
-                      <th style={TH_STYLE}>PnL</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pnlBySymbolOnly.map((row, idx) => {
-                      const rowStyle: React.CSSProperties = {
-                        ...TD_STYLE_BASE,
-                        backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                      };
-                      return (
-                        <tr key={row.symbol}>
-                          <td style={rowStyle}>{row.symbol}</td>
-                          <td style={rowStyle}>{row.trades}</td>
-                          <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                        </tr>
-                      );
-                    })}
-                    {pnlBySymbolOnly.length === 0 && (
-                      <tr>
-                        <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={3}>
-                          Sin datos.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16 }}>
+              <PerfTable title="Top mejor comportamiento" rows={topBest} columns={dynamicColumnLabels} minTrades={minTrades} idPrefix="top_mejor" />
+              <PerfTable title="Top peor comportamiento" rows={topWorst} columns={dynamicColumnLabels} minTrades={minTrades} idPrefix="top_peor" />
             </div>
           </>
         )}
       </div>
 
-      {/* Performance por EA / símbolo / timeframe (tablas grandes) */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
-        {/* Performance por EA */}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 2fr) minmax(260px, 1fr)", gap: 16, marginBottom: 16 }}>
         <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Performance por EA</h2>
-          <table style={TABLE_STYLE}>
-            <thead>
-              <tr>
-                <th style={TH_STYLE}>EA</th>
-                <th style={TH_STYLE}>Trades</th>
-                <th style={TH_STYLE}>Wins</th>
-                <th style={TH_STYLE}>Losses</th>
-                <th style={TH_STYLE}>Win%</th>
-                <th style={TH_STYLE}>PnL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {perfByEA.map((row, idx) => {
-                const rowStyle: React.CSSProperties = {
-                  ...TD_STYLE_BASE,
-                  backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                };
-                return (
-                  <tr key={row.key}>
-                    <td style={rowStyle}>{row.key}</td>
-                    <td style={rowStyle}>{row.trades}</td>
-                    <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                    <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                    <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                    <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                  </tr>
-                );
-              })}
-              {perfByEA.length === 0 && (
-                <tr>
-                  <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={6}>
-                    Sin datos en este filtro.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Performance por símbolo */}
-        <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Performance por símbolo</h2>
-          <table style={TABLE_STYLE}>
-            <thead>
-              <tr>
-                <th style={TH_STYLE}>Símbolo</th>
-                <th style={TH_STYLE}>Trades</th>
-                <th style={TH_STYLE}>Wins</th>
-                <th style={TH_STYLE}>Losses</th>
-                <th style={TH_STYLE}>Win%</th>
-                <th style={TH_STYLE}>PnL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {perfBySymbol.map((row, idx) => {
-                const rowStyle: React.CSSProperties = {
-                  ...TD_STYLE_BASE,
-                  backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                };
-                return (
-                  <tr key={row.key}>
-                    <td style={rowStyle}>{row.key}</td>
-                    <td style={rowStyle}>{row.trades}</td>
-                    <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                    <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                    <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                    <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                  </tr>
-                );
-              })}
-              {perfBySymbol.length === 0 && (
-                <tr>
-                  <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={6}>
-                    Sin datos en este filtro.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Performance por timeframe */}
-        <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-            Performance por timeframe
-          </h2>
-          <table style={TABLE_STYLE}>
-            <thead>
-              <tr>
-                <th style={TH_STYLE}>TF</th>
-                <th style={TH_STYLE}>Trades</th>
-                <th style={TH_STYLE}>Wins</th>
-                <th style={TH_STYLE}>Losses</th>
-                <th style={TH_STYLE}>Win%</th>
-                <th style={TH_STYLE}>PnL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {perfByTimeframe.map((row, idx) => {
-                const rowStyle: React.CSSProperties = {
-                  ...TD_STYLE_BASE,
-                  backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                };
-                return (
-                  <tr key={row.key}>
-                    <td style={rowStyle}>{row.key}</td>
-                    <td style={rowStyle}>{row.trades}</td>
-                    <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                    <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                    <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                    <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                  </tr>
-                );
-              })}
-              {perfByTimeframe.length === 0 && (
-                <tr>
-                  <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={6}>
-                    Sin datos en este filtro.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Gráficas: barras + pastel */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(260px, 2fr) minmax(260px, 1.5fr)",
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
-        {/* Barras por símbolo */}
-        <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-            Gráfica de barras — PnL por símbolo
-          </h2>
-          {chartDataSymbolPnL.length === 0 ? (
-            <p style={{ fontSize: 12, opacity: 0.8 }}>Sin datos para este filtro.</p>
+          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Equity curve — PnL acumulado</h2>
+          {equityCurve.length === 0 ? (
+            <p style={{ fontSize: 12, opacity: 0.8 }}>Sin datos.</p>
           ) : (
-            <div style={{ width: "100%", height: 260 }}>
+            <div style={{ width: "100%", height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartDataSymbolPnL}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                  <XAxis dataKey="symbol" stroke="#ccc" />
-                  <YAxis stroke="#ccc" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#111", border: "1px solid #333" }}
-                    formatter={(value: any, name: any) =>
-                      name === "pnl" ? fmtMoney(Number(value)) : value
-                    }
-                  />
-                  <Legend />
-                  <Bar dataKey="pnl" name="PnL" fill="#2196f3" />
-                </BarChart>
+                <LineChart data={equityCurve}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                  <XAxis dataKey="n" stroke={AXIS} tick={{ fontSize: 11 }} />
+                  <YAxis stroke={AXIS} />
+                  <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #333" }} formatter={(value: any) => fmtMoney(Number(value))} labelFormatter={(label) => `Trade #${label}`} />
+                  <Line type="monotone" dataKey="pnl" name="PnL acumulado" stroke={summary.pnl >= 0 ? GREEN : RED} strokeWidth={2.5} dot={false} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           )}
         </div>
-
-        {/* Pastel wins vs losses */}
         <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-            Gráfica de pastel — Wins vs Losses
-          </h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Wins vs Losses</h2>
           {summary.total === 0 ? (
-            <p style={{ fontSize: 12, opacity: 0.8 }}>Sin datos para este filtro.</p>
+            <p style={{ fontSize: 12, opacity: 0.8 }}>Sin datos.</p>
           ) : (
-            <div style={{ width: "100%", height: 260, display: "flex", justifyContent: "center" }}>
+            <div style={{ width: "100%", height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#111", border: "1px solid #333" }}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #333" }} />
                   <Legend />
-                  <Pie
-                    data={pieWinLossData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label
-                  >
-                    {pieWinLossData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  <Pie data={pieWinLossData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} label>
+                    {[GREEN, RED, NEUTRAL].map((c) => (
+                      <Cell key={c} fill={c} />
                     ))}
                   </Pie>
                 </PieChart>
@@ -2200,909 +1474,97 @@ export default function ChartsPage() {
         </div>
       </div>
 
-      {/* Heatmap EA × Timeframe */}
-      <div style={CARD_STYLE}>
-        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-          Heatmap — EA × Timeframe (Winrate)
-        </h2>
-        <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
-          Cada celda muestra el win rate y número de trades para esa combinación EA × TF,
-          usando solo los trades del filtro global actual.
-        </p>
+      <h2 style={{ fontSize: 18, margin: "4px 0 12px" }}>Dónde gano / dónde pierdo</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 16, marginBottom: 16 }}>
+        {renderMiniChart("PnL por EA", perfByEA)}
+        {renderMiniChart("PnL por símbolo", perfBySymbol)}
+        {renderMiniChart("PnL por timeframe", perfByTimeframe)}
+        {renderMiniChart("PnL por sesión", perfBySession)}
+        {renderMiniChart("PnL por día", perfByDay)}
+        {renderMiniChart("PnL por hora", perfByHour)}
+        {renderMiniChart("PnL por patrón", perfByPatron)}
+        {renderMiniChart("PnL por emoción", perfByEmocion)}
+        {renderMiniChart("PnL por dirección BUY/SELL", perfBySide)}
+      </div>
 
-        {heatmapEA_TF.eas.length === 0 || heatmapEA_TF.timeframes.length === 0 ? (
-          <p style={{ fontSize: 12, opacity: 0.8 }}>Sin datos para este filtro.</p>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={TABLE_STYLE}>
-              <thead>
-                <tr>
-                  <th style={TH_STYLE}>EA \ TF</th>
-                  {heatmapEA_TF.timeframes.map((tf) => (
-                    <th key={tf} style={TH_STYLE}>
-                      {tf}
-                    </th>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 16, marginBottom: 16 }}>
+        <PerfTable title="Performance por EA" rows={perfByEA} columns={["EA"]} minTrades={minTrades} idPrefix="perf_ea" />
+        <PerfTable title="Performance por símbolo" rows={perfBySymbol} columns={["Símbolo"]} minTrades={minTrades} idPrefix="perf_symbol" />
+        <PerfTable title="Performance por timeframe" rows={perfByTimeframe} columns={["TF"]} minTrades={minTrades} idPrefix="perf_tf" />
+        <PerfTable title="Performance por sesión" rows={perfBySession} columns={["Sesión"]} minTrades={minTrades} idPrefix="perf_session" />
+        <PerfTable title="Performance por día" rows={perfByDay} columns={["Día"]} minTrades={minTrades} idPrefix="perf_day" />
+        <PerfTable title="Performance por hora" rows={perfByHour} columns={["Hora"]} minTrades={minTrades} idPrefix="perf_hour" />
+        <PerfTable title="Performance por patrón" rows={perfByPatron} columns={["Patrón"]} minTrades={minTrades} idPrefix="perf_patron" />
+        <PerfTable title="Performance por emoción" rows={perfByEmocion} columns={["Emoción"]} minTrades={minTrades} idPrefix="perf_emocion" />
+        <PerfTable title="Performance por dirección" rows={perfBySide} columns={["Dirección"]} minTrades={minTrades} idPrefix="perf_side" />
+      </div>
+
+      <h2 style={{ fontSize: 18, margin: "4px 0 12px" }}>Confluencias fijas</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginBottom: 16 }}>
+        <PerfTable title="EA + símbolo + TF" rows={confluenceBase} columns={["EA", "Símbolo", "TF"]} minTrades={minTrades} idPrefix="confluencia_base" />
+        <PerfTable title="EA + símbolo + TF + patrón" rows={confluencePatron} columns={["EA", "Símbolo", "TF", "Patrón"]} minTrades={minTrades} idPrefix="confluencia_patron" />
+        <PerfTable title="EA + símbolo + TF + vela" rows={confluenceVela} columns={["EA", "Símbolo", "TF", "Vela"]} minTrades={minTrades} idPrefix="confluencia_vela" />
+        <PerfTable title="EA + símbolo + TF + emoción" rows={confluenceEmocion} columns={["EA", "Símbolo", "TF", "Emoción"]} minTrades={minTrades} idPrefix="confluencia_emocion" />
+        <PerfTable title="EA + símbolo + TF + sesión" rows={confluenceSession} columns={["EA", "Símbolo", "TF", "Sesión"]} minTrades={minTrades} idPrefix="confluencia_sesion" />
+        <PerfTable title="EA + símbolo + TF + dirección BUY/SELL" rows={confluenceSide} columns={["EA", "Símbolo", "TF", "Dirección"]} minTrades={minTrades} idPrefix="confluencia_side" />
+      </div>
+
+      <div style={CARD_STYLE}>
+        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Generador dinámico de confluencias</h2>
+        <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>Escoge las piezas de la confluencia y Bitlog genera el ranking y la gráfica al momento. Sin redundancia, sin circo.</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          {DIMENSION_OPTIONS.map(([dim, label]) => (
+            <button key={dim} type="button" className="btn" onClick={() => toggleDynamicDim(dim)} style={{ ...renderButtonStyle, backgroundColor: dynamicDims.includes(dim) ? "#1f2937" : undefined }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 12 }}>
+          <div className="field">
+            <div className="label">Métrica de gráfica</div>
+            <select className="input" value={dynamicMetric} onChange={(e) => setDynamicMetric(e.target.value as MetricKey)}>
+              <option value="pnl">PnL</option>
+              <option value="winRate">Win%</option>
+              <option value="trades">Trades</option>
+            </select>
+          </div>
+          <div>
+            <div className="label">Confluencia actual</div>
+            <div style={{ fontSize: 13, paddingTop: 8 }}>{dynamicDims.join(" + ")}</div>
+          </div>
+        </div>
+        <div style={{ width: "100%", height: dynamicChartHeight, marginBottom: 14 }}>
+          {chartRows.length === 0 ? (
+            <p style={{ fontSize: 12, opacity: 0.8 }}>Sin datos suficientes con el mínimo de trades actual.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartRows} layout="vertical" margin={{ left: 10, right: 30 }} barCategoryGap="30%">
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                <XAxis type="number" stroke={AXIS} />
+                <YAxis type="category" dataKey="key" stroke={AXIS} width={200} tick={{ fontSize: 11 }} interval={0} />
+                <Tooltip content={<MiniChartTooltipContent />} />
+                <Legend />
+                <Bar
+                  dataKey="metric"
+                  name={chartMetricLabel}
+                  radius={[0, 6, 6, 0]}
+                  barSize={22}
+                  background={(props: any) => (
+                    <rect x={props.x} y={props.y} width={props.width} height={props.height} fill={props.index % 2 === 0 ? "#151515" : "#0b0b0b"} />
+                  )}
+                >
+                  {chartRows.map((entry) => (
+                    <Cell key={entry.key} fill={Number(entry.metric) >= 0 ? GREEN : RED} />
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {heatmapEA_TF.eas.map((ea, rowIdx) => (
-                  <tr key={ea}>
-                    <td
-                      style={{
-                        ...TD_STYLE_BASE,
-                        backgroundColor: rowIdx % 2 === 0 ? "#151515" : "#101010",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {ea}
-                    </td>
-                    {heatmapEA_TF.timeframes.map((tf) => {
-                      const key = `${ea}__${tf}`;
-                      const cell = heatmapEA_TF.cellMap.get(key);
-                      const tradesCount = cell?.trades ?? 0;
-                      const winRate = cell?.winRate ?? 0;
-                      const bg = getHeatCellColor(winRate, tradesCount);
-                      return (
-                        <td
-                          key={tf}
-                          style={{
-                            ...TD_STYLE_BASE,
-                            textAlign: "center",
-                            backgroundColor: bg,
-                            color: "#fff",
-                            fontSize: 12,
-                          }}
-                          title={
-                            tradesCount > 0
-                              ? `Win rate: ${fmtPct(winRate)} | Trades: ${tradesCount}`
-                              : "Sin trades"
-                          }
-                        >
-                          {tradesCount === 0 ? "—" : `${fmtPct(winRate)} (${tradesCount})`}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        <PerfTable title="Ranking dinámico" rows={dynamicConfluence.filter((r) => r.trades >= minTrades)} columns={dynamicColumnLabels} minTrades={minTrades} idPrefix="ranking_dinamico" />
       </div>
 
-      {/* Tiempo & motivos de cierre */}
-      <div style={CARD_STYLE}>
-        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-          Tiempo & motivos de cierre
-        </h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(200px,0.8fr) minmax(260px,1.6fr)",
-            gap: 16,
-          }}
-        >
-          {/* Duración promedio */}
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 14 }}>
-              Duración promedio de los trades (cerrados)
-            </h3>
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: 700,
-                marginBottom: 4,
-              }}
-            >
-              {formatDurationHMS(avgDurationMs)}
-            </div>
-            <p style={{ fontSize: 12, opacity: 0.8, margin: 0 }}>
-              Calculado solo con trades que tienen fecha de apertura y cierre válidas en este
-              filtro global.
-            </p>
-          </div>
-
-          {/* Desglose por close_reason */}
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 14 }}>
-              Desglose por motivo de cierre
-            </h3>
-            <table style={TABLE_STYLE}>
-              <thead>
-                <tr>
-                  <th style={TH_STYLE}>Motivo</th>
-                  <th style={TH_STYLE}>Trades</th>
-                  <th style={TH_STYLE}>Wins</th>
-                  <th style={TH_STYLE}>Losses</th>
-                  <th style={TH_STYLE}>Win%</th>
-                  <th style={TH_STYLE}>PnL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {perfByCloseReason.map((row, idx) => {
-                  const rowStyle: React.CSSProperties = {
-                    ...TD_STYLE_BASE,
-                    backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                  };
-                 
-       
-                      const label =
-                        row.reason === "TP"
-                            ? "TP"
-                            : row.reason === "SL"
-                            ? "SL"
-                            : row.reason === "USER"
-                            ? "USER"
-                            : row.reason === "NULL"
-                            ? "NULL"
-                            : row.reason;
-                            
-                  return (
-                    <tr key={row.reason}>
-                      <td style={rowStyle}>{label}</td>
-                      <td style={rowStyle}>{row.trades}</td>
-                      <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                      <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                      <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                      <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                    </tr>
-                  );
-                })}
-                {perfByCloseReason.length === 0 && (
-                  <tr>
-                    <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={6}>
-                      Sin datos de cierre en este filtro.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* Performance por día de la semana */}
-      <div style={CARD_STYLE}>
-        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-          Performance por día de la semana
-        </h2>
-        <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
-          Te muestra en qué días sueles ganar o perder más, usando la fecha de apertura de cada
-          trade bajo el filtro global actual.
-        </p>
-        <table style={TABLE_STYLE}>
-          <thead>
-            <tr>
-              <th style={TH_STYLE}>Día</th>
-              <th style={TH_STYLE}>Trades</th>
-              <th style={TH_STYLE}>Wins</th>
-              <th style={TH_STYLE}>Losses</th>
-              <th style={TH_STYLE}>Win%</th>
-              <th style={TH_STYLE}>PnL</th>
-            </tr>
-          </thead>
-          <tbody>
-            {perfByDayOfWeek.map((row, idx) => {
-              const rowStyle: React.CSSProperties = {
-                ...TD_STYLE_BASE,
-                backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-              };
-              return (
-                <tr key={row.label}>
-                  <td style={rowStyle}>{row.label}</td>
-                  <td style={rowStyle}>{row.trades}</td>
-                  <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                  <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                  <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                  <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Performance por hora del día */}
-      <div style={CARD_STYLE}>
-        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-          Performance por hora del día (Mazatlán)
-        </h2>
-        <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
-          Útil para ver si eres más fuerte en la mañana (ej. 7–9 AM) o en otros horarios, según
-          la hora de apertura de cada trade.
-        </p>
-        <table style={TABLE_STYLE}>
-          <thead>
-            <tr>
-              <th style={TH_STYLE}>Hora</th>
-              <th style={TH_STYLE}>Trades</th>
-              <th style={TH_STYLE}>Wins</th>
-              <th style={TH_STYLE}>Losses</th>
-              <th style={TH_STYLE}>Win%</th>
-              <th style={TH_STYLE}>PnL</th>
-            </tr>
-          </thead>
-          <tbody>
-            {perfByHourOfDay.map((row, idx) => {
-              const rowStyle: React.CSSProperties = {
-                ...TD_STYLE_BASE,
-                backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-              };
-              return (
-                <tr key={row.hour}>
-                  <td style={rowStyle}>{row.label}</td>
-                  <td style={rowStyle}>{row.trades}</td>
-                  <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                  <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                  <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                  <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Confluencias: EA + símbolo + timeframe */}
-      <div style={CARD_STYLE}>
-        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-          Confluencias: EA + símbolo + timeframe
-        </h2>
-        <table style={TABLE_STYLE}>
-          <thead>
-            <tr>
-              <th style={TH_STYLE}>EA</th>
-              <th style={TH_STYLE}>Símbolo</th>
-              <th style={TH_STYLE}>TF</th>
-              <th style={TH_STYLE}>Trades</th>
-              <th style={TH_STYLE}>Wins</th>
-              <th style={TH_STYLE}>Losses</th>
-              <th style={TH_STYLE}>Win%</th>
-              <th style={TH_STYLE}>PnL</th>
-            </tr>
-          </thead>
-          <tbody>
-            {combosEA_Symbol_TF.map((row, idx) => {
-              const rowStyle: React.CSSProperties = {
-                ...TD_STYLE_BASE,
-                backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-              };
-              return (
-                <tr key={`${row.ea}__${row.symbol}__${row.timeframe}`}>
-                  <td style={rowStyle}>{row.ea}</td>
-                  <td style={rowStyle}>{row.symbol}</td>
-                  <td style={rowStyle}>{row.timeframe}</td>
-                  <td style={rowStyle}>{row.trades}</td>
-                  <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                  <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                  <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                  <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                </tr>
-              );
-            })}
-            {combosEA_Symbol_TF.length === 0 && (
-              <tr>
-                <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={8}>
-                  Sin combinaciones en este filtro.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Bloques de confluencias avanzadas (UNO ABAJO DEL OTRO, FULL WIDTH) */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr",
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
-        {/* EA + símbolo + TF + patrón */}
-        <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-            Confluencias avanzadas: EA + símbolo + TF + patrón
-          </h2>
-          <table style={TABLE_STYLE}>
-            <thead>
-              <tr>
-                <th style={TH_STYLE}>EA</th>
-                <th style={TH_STYLE}>Símbolo</th>
-                <th style={TH_STYLE}>TF</th>
-                <th style={TH_STYLE}>Patrón</th>
-                <th style={TH_STYLE}>Trades</th>
-                <th style={TH_STYLE}>Wins</th>
-                <th style={TH_STYLE}>Losses</th>
-                <th style={TH_STYLE}>Win%</th>
-                <th style={TH_STYLE}>PnL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {confEA_Symbol_TF_Patron.map((row, idx) => {
-                const rowStyle: React.CSSProperties = {
-                  ...TD_STYLE_BASE,
-                  backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                };
-                return (
-                  <tr key={`${row.ea}__${row.symbol}__${row.timeframe}__${row.extra}`}>
-                    <td style={rowStyle}>{row.ea}</td>
-                    <td style={rowStyle}>{row.symbol}</td>
-                    <td style={rowStyle}>{row.timeframe}</td>
-                    <td style={rowStyle}>{row.extra}</td>
-                    <td style={rowStyle}>{row.trades}</td>
-                    <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                    <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                    <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                    <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                  </tr>
-                );
-              })}
-              {confEA_Symbol_TF_Patron.length === 0 && (
-                <tr>
-                  <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={9}>
-                    Sin datos.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* EA + símbolo + TF + vela */}
-        <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-            Confluencias avanzadas: EA + símbolo + TF + vela
-          </h2>
-          <table style={TABLE_STYLE}>
-            <thead>
-              <tr>
-                <th style={TH_STYLE}>EA</th>
-                <th style={TH_STYLE}>Símbolo</th>
-                <th style={TH_STYLE}>TF</th>
-                <th style={TH_STYLE}>Vela</th>
-                <th style={TH_STYLE}>Trades</th>
-                <th style={TH_STYLE}>Wins</th>
-                <th style={TH_STYLE}>Losses</th>
-                <th style={TH_STYLE}>Win%</th>
-                <th style={TH_STYLE}>PnL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {confEA_Symbol_TF_Vela.map((row, idx) => {
-                const rowStyle: React.CSSProperties = {
-                  ...TD_STYLE_BASE,
-                  backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                };
-                return (
-                  <tr key={`${row.ea}__${row.symbol}__${row.timeframe}__${row.extra}`}>
-                    <td style={rowStyle}>{row.ea}</td>
-                    <td style={rowStyle}>{row.symbol}</td>
-                    <td style={rowStyle}>{row.timeframe}</td>
-                    <td style={rowStyle}>{row.extra}</td>
-                    <td style={rowStyle}>{row.trades}</td>
-                    <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                    <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                    <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                    <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                  </tr>
-                );
-              })}
-              {confEA_Symbol_TF_Vela.length === 0 && (
-                <tr>
-                  <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={9}>
-                    Sin datos.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* EA + símbolo + TF + emoción */}
-        <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-            Confluencias avanzadas: EA + símbolo + TF + emoción
-          </h2>
-          <table style={TABLE_STYLE}>
-            <thead>
-              <tr>
-                <th style={TH_STYLE}>EA</th>
-                <th style={TH_STYLE}>Símbolo</th>
-                <th style={TH_STYLE}>TF</th>
-                <th style={TH_STYLE}>Emoción</th>
-                <th style={TH_STYLE}>Trades</th>
-                <th style={TH_STYLE}>Wins</th>
-                <th style={TH_STYLE}>Losses</th>
-                <th style={TH_STYLE}>Win%</th>
-                <th style={TH_STYLE}>PnL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {confEA_Symbol_TF_Emocion.map((row, idx) => {
-                const rowStyle: React.CSSProperties = {
-                  ...TD_STYLE_BASE,
-                  backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                };
-                return (
-                  <tr key={`${row.ea}__${row.symbol}__${row.timeframe}__${row.extra}`}>
-                    <td style={rowStyle}>{row.ea}</td>
-                    <td style={rowStyle}>{row.symbol}</td>
-                    <td style={rowStyle}>{row.timeframe}</td>
-                    <td style={rowStyle}>{row.extra}</td>
-                    <td style={rowStyle}>{row.trades}</td>
-                    <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                    <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                    <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                    <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                  </tr>
-                );
-              })}
-              {confEA_Symbol_TF_Emocion.length === 0 && (
-                <tr>
-                  <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={9}>
-                    Sin datos.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* EA + símbolo + TF + sesión */}
-        <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-            Confluencias avanzadas: EA + símbolo + TF + sesión
-          </h2>
-          <table style={TABLE_STYLE}>
-            <thead>
-              <tr>
-                <th style={TH_STYLE}>EA</th>
-                <th style={TH_STYLE}>Símbolo</th>
-                <th style={TH_STYLE}>TF</th>
-                <th style={TH_STYLE}>Sesión</th>
-                <th style={TH_STYLE}>Trades</th>
-                <th style={TH_STYLE}>Wins</th>
-                <th style={TH_STYLE}>Losses</th>
-                <th style={TH_STYLE}>Win%</th>
-                <th style={TH_STYLE}>PnL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {confEA_Symbol_TF_Session.map((row, idx) => {
-                const rowStyle: React.CSSProperties = {
-                  ...TD_STYLE_BASE,
-                  backgroundColor: idx % 2 === 0 ? "#151515" : "#101010",
-                };
-                return (
-                  <tr key={`${row.ea}__${row.symbol}__${row.timeframe}__${row.extra}`}>
-                    <td style={rowStyle}>{row.ea}</td>
-                    <td style={rowStyle}>{row.symbol}</td>
-                    <td style={rowStyle}>{row.timeframe}</td>
-                    <td style={rowStyle}>{row.extra}</td>
-                    <td style={rowStyle}>{row.trades}</td>
-                    <td style={{ ...rowStyle, color: "#4caf50" }}>{row.wins}</td>
-                    <td style={{ ...rowStyle, color: "#f44336" }}>{row.losses}</td>
-                    <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                    <td style={rowStyle}>{fmtMoney(row.pnl)}</td>
-                  </tr>
-                );
-              })}
-              {confEA_Symbol_TF_Session.length === 0 && (
-                <tr>
-                  <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={9}>
-                    Sin datos.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Filtro de confluencias avanzado + detalle de trades filtrados */}
-      <div style={CARD_STYLE}>
-        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-          Filtro de confluencias avanzado
-        </h2>
-        <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
-          Primero se aplican los filtros globales. Luego aquí eliges la combinación específica
-          (EA, símbolo, TF, sesión, emoción, patrón, vela) y se muestra el detalle de trades.
-        </p>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-            gap: 12,
-            marginBottom: 12,
-          }}
-        >
-          <div className="field">
-            <div className="label">EA</div>
-            <select
-              className="input"
-              value={confEa}
-              onChange={(e) => setConfEa(e.target.value)}
-            >
-              <option value="">(Todos)</option>
-              {allEAs.map((ea) => (
-                <option key={ea} value={ea}>
-                  {ea}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <div className="label">Símbolo</div>
-            <select
-              className="input"
-              value={confSymbol}
-              onChange={(e) => setConfSymbol(e.target.value)}
-            >
-              <option value="">(Todos)</option>
-              {allSymbols.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <div className="label">Timeframe</div>
-            <select
-              className="input"
-              value={confTf}
-              onChange={(e) => setConfTf(e.target.value)}
-            >
-              <option value="">(Todos)</option>
-              {allTimeframes.map((tf) => (
-                <option key={tf} value={tf}>
-                  {tf}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <div className="label">Sesión</div>
-            <select
-              className="input"
-              value={confSession}
-              onChange={(e) => setConfSession(e.target.value)}
-            >
-              <option value="">(Todas)</option>
-              {allSessions.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <div className="label">Emoción</div>
-            <select
-              className="input"
-              value={confEmocion}
-              onChange={(e) => setConfEmocion(e.target.value)}
-            >
-              <option value="">(Todas)</option>
-              {allEmociones.map((e) => (
-                <option key={e} value={e}>
-                  {e}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <div className="label">Patrón</div>
-            <select
-              className="input"
-              value={confPatron}
-              onChange={(e) => setConfPatron(e.target.value)}
-            >
-              <option value="">(Todos)</option>
-              {allPatrones.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <div className="label">Vela</div>
-            <select
-              className="input"
-              value={confVela}
-              onChange={(e) => setConfVela(e.target.value)}
-            >
-              <option value="">(Todas)</option>
-              {allVelas.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Botones de confluencia en un solo renglón, más pequeños, esquinas cuadradas */}
-        <div
-          className="btn-row"
-          style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "nowrap",
-            marginBottom: 8,
-          }}
-        >
-          <button
-            className="btn"
-            type="button"
-            onClick={applyConfluenceFilters}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "3px 8px",
-              fontSize: 11,
-              borderRadius: 0,
-              minWidth: 0,
-              width: "auto",
-            }}
-          >
-            Aplicar filtros de confluencia
-          </button>
-          <button
-            className="btn"
-            type="button"
-            onClick={clearConfluenceFilters}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "3px 8px",
-              fontSize: 11,
-              borderRadius: 0,
-              minWidth: 0,
-              width: "auto",
-            }}
-          >
-            Limpiar filtros de confluencia
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-            gap: 12,
-            marginBottom: 12,
-          }}
-        >
-          <div>
-            <div className="label">Trades</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{confSummary.total}</div>
-          </div>
-          <div>
-            <div className="label">Wins</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#4caf50" }}>
-              {confSummary.wins}
-            </div>
-          </div>
-          <div>
-            <div className="label">Losses</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#f44336" }}>
-              {confSummary.losses}
-            </div>
-          </div>
-          <div>
-            <div className="label">Win rate</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>
-              {fmtPct(confSummary.winRate)}
-            </div>
-          </div>
-          <div>
-            <div className="label">PnL</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>
-              {fmtMoney(confSummary.pnl)}
-            </div>
-          </div>
-        </div>
-
-        {/* Detalle de trades (filtrados) */}
-        <div
-          style={{
-            maxHeight: 320,
-            overflow: "auto",
-            borderRadius: 8,
-            border: "1px solid #222",
-          }}
-        >
-          <h3
-            style={{
-              margin: 0,
-              padding: "6px 8px",
-              fontSize: 14,
-              borderBottom: "1px solid #333",
-              backgroundColor: "#000",
-            }}
-          >
-            Detalle de trades (filtrados)
-          </h3>
-          <table style={TABLE_STYLE}>
-            <thead>
-              <tr>
-                <th style={TH_STYLE}>ID</th>
-                <th style={TH_STYLE}>Ticket</th>
-                <th style={TH_STYLE}>Símbolo</th>
-                <th style={TH_STYLE}>TF</th>
-                <th style={TH_STYLE}>EA</th>
-                <th style={TH_STYLE}>Sesión</th>
-                <th style={TH_STYLE}>Emoción</th>
-                <th style={TH_STYLE}>Patrón</th>
-                <th style={TH_STYLE}>Vela</th>
-                <th style={TH_STYLE}>Open</th>
-                <th style={TH_STYLE}>Close</th>
-                <th style={TH_STYLE}>PnL</th>
-                <th style={TH_STYLE}>Cierre</th>
-                <th style={TH_STYLE}>Ver</th>
-              </tr>
-            </thead>
-            <tbody>
-              {confFilteredTrades.map((t, idx) => {
-                const isWin = safeNumber(t.pnl_usd_gross) > 0;
-                const isLoss = safeNumber(t.pnl_usd_gross) < 0;
-                const rowBg = idx % 2 === 0 ? "#151515" : "#101010";
-                const tdBase: React.CSSProperties = {
-                  ...TD_STYLE_BASE,
-                  backgroundColor: rowBg,
-                };
-                return (
-                  <tr key={t.id}>
-                    <td style={tdBase}>{t.id}</td>
-                    <td style={tdBase}>{t.ticket || "—"}</td>
-                    <td style={tdBase}>{t.symbol || "—"}</td>
-                    <td style={tdBase}>{t.timeframe || "—"}</td>
-                    <td style={tdBase}>{t.ea || "—"}</td>
-                    <td style={tdBase}>{t.session || "—"}</td>
-                    <td style={tdBase}>{t.emocion || "—"}</td>
-                    <td style={tdBase}>{t.patron || "—"}</td>
-                    <td style={tdBase}>{t.vela || "—"}</td>
-                    <td style={tdBase}>{fmtDateShort(t.dt_open_utc)}</td>
-                    <td style={tdBase}>{fmtDateShort(t.dt_close_utc)}</td>
-                    <td
-                      style={{
-                        ...tdBase,
-                        color: isWin ? "#4caf50" : isLoss ? "#f44336" : "#ccc",
-                      }}
-                    >
-                      {fmtMoney(safeNumber(t.pnl_usd_gross))}
-                    </td>
-                    <td style={tdBase}>
-                      <span
-                        style={{
-                          ...BADGE_STYLE_BASE,
-                          backgroundColor:
-                            (t.close_reason || "").toUpperCase() === "TP"
-                              ? "#1b5e20"
-                              : (t.close_reason || "").toUpperCase() === "SL"
-                              ? "#b71c1c"
-                              : "#424242",
-                          color: "#fff",
-                        }}
-                      >
-                        {(t.close_reason || "—").toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={tdBase}>
-                      <a
-                        href={`/trades/${t.id}`}
-                        className="btn link"
-                        style={{ fontSize: 11, padding: "3px 6px" }}
-                      >
-                        Ver
-                      </a>
-                    </td>
-                  </tr>
-                );
-              })}
-              {confFilteredTrades.length === 0 && (
-                <tr>
-                  <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={14}>
-                    No hay trades para esta combinación (o aún no aplicas filtros).
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Muestra de trades filtrados globales */}
-      <div style={CARD_STYLE}>
-        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>
-          Detalle de trades (filtro global)
-        </h2>
-        <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
-          Aquí ves los trades resultantes de los filtros globales. Útil para revisar rápidamente
-          qué está alimentando los bloques de arriba.
-        </p>
-        <div
-          style={{
-            maxHeight: 320,
-            overflow: "auto",
-            borderRadius: 8,
-            border: "1px solid #222",
-          }}
-        >
-          <table style={TABLE_STYLE}>
-            <thead>
-              <tr>
-                <th style={TH_STYLE}>ID</th>
-                <th style={TH_STYLE}>Ticket</th>
-                <th style={TH_STYLE}>Símbolo</th>
-                <th style={TH_STYLE}>TF</th>
-                <th style={TH_STYLE}>EA</th>
-                <th style={TH_STYLE}>Sesión</th>
-                <th style={TH_STYLE}>Open (UTC -7)</th>
-                <th style={TH_STYLE}>Close (UTC -7)</th>
-                <th style={TH_STYLE}>PnL</th>
-                <th style={TH_STYLE}>Ver</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleTrades.map((t, idx) => {
-                const isWin = safeNumber(t.pnl_usd_gross) > 0;
-                const isLoss = safeNumber(t.pnl_usd_gross) < 0;
-                const rowBg = idx % 2 === 0 ? "#151515" : "#101010";
-                const tdBase: React.CSSProperties = {
-                  ...TD_STYLE_BASE,
-                  backgroundColor: rowBg,
-                };
-                return (
-                  <tr key={t.id}>
-                    <td style={tdBase}>{t.id}</td>
-                    <td style={tdBase}>{t.ticket || "—"}</td>
-                    <td style={tdBase}>{t.symbol || "—"}</td>
-                    <td style={tdBase}>{t.timeframe || "—"}</td>
-                    <td style={tdBase}>{t.ea || "—"}</td>
-                    <td style={tdBase}>{t.session || "—"}</td>
-                    <td style={tdBase}>{fmtDateShort(t.dt_open_utc)}</td>
-                    <td style={tdBase}>{fmtDateShort(t.dt_close_utc)}</td>
-                    <td
-                      style={{
-                        ...tdBase,
-                        color: isWin ? "#4caf50" : isLoss ? "#f44336" : "#ccc",
-                      }}
-                    >
-                      {fmtMoney(safeNumber(t.pnl_usd_gross))}
-                    </td>
-                    <td style={tdBase}>
-                      <a
-                        href={`/trades/${t.id}`}
-                        className="btn link"
-                        style={{ fontSize: 11, padding: "3px 6px" }}
-                      >
-                        Ver
-                      </a>
-                    </td>
-                  </tr>
-                );
-              })}
-              {visibleTrades.length === 0 && (
-                <tr>
-                  <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={10}>
-                    Sin trades en este filtro global.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <TradeDetailTable trades={visibleTrades} />
     </div>
   );
 }
-
