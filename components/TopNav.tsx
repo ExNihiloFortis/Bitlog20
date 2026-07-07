@@ -1,6 +1,4 @@
 // ===================== /components/TopNav.tsx =====================
-// Barra superior unificada (BitLog)
-// ================================================================
 
 "use client";
 
@@ -8,28 +6,50 @@ import React, { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { isValidTicket } from "@/lib/validateTicket";
 
-type NavLink = {
+type NavItem = {
   href: string;
   label: string;
   isFundamental?: boolean;
 };
 
-const NAV_LINKS: NavLink[] = [
-  { href: "/", label: "Home" },
-  { href: "/trades", label: "Trades" },
-  { href: "/trades/new", label: "New" },
-  { href: "/field-edits", label: "F.Edits" },
-  { href: "/import", label: "Import" },
-  { href: "/checklist", label: "Chklist" },
-  { href: "/calendar", label: "📆" },
-  { href: "/whatif", label: "❎" },
-  { href: "/journal", label: "📔" },
-  { href: "/charts", label: "📊" },
-  { href: "/fundamental", label: "📰", isFundamental: true },
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Trades",
+    items: [
+      { href: "/trades", label: "Real Trades" },
+      { href: "/fake-trades", label: "Fake Trades" },
+    ],
+  },
+  {
+    label: "New",
+    items: [
+      { href: "/trades/new", label: "Real Trade" },
+      { href: "/fake-trades/new", label: "Fake Trade" },
+    ],
+  },
+  {
+    label: "Tools",
+    items: [
+      { href: "/checklist", label: "Checklist" },
+      { href: "/calendar", label: "Calendar" },
+      { href: "/whatif", label: "What If" },
+      { href: "/journal", label: "Journal" },
+      { href: "/charts", label: "Charts" },
+      { href: "/fundamental", label: "News", isFundamental: true },
+      { href: "/field-edits", label: "Field Edits" },
+      { href: "/import", label: "Import" },
+    ],
+  },
 ];
 
 export default function TopNav() {
   const [ticket, setTicket] = useState("");
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -51,6 +71,15 @@ export default function TopNav() {
     return pathname?.startsWith(href);
   };
 
+  const groupIsActive = (group: NavGroup) => {
+    return group.items.some((item) => isActive(item.href));
+  };
+
+  const goTo = (href: string) => {
+    setOpenMenu(null);
+    router.push(href);
+  };
+
   return (
     <nav
       style={{
@@ -58,9 +87,11 @@ export default function TopNav() {
         background: "#020617",
         borderBottom: "1px solid #111827",
         padding: "10px 0",
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
       }}
     >
-      {/* Wrapper centrado */}
       <div
         style={{
           maxWidth: 1200,
@@ -68,68 +99,133 @@ export default function TopNav() {
           padding: "0 16px",
           display: "flex",
           justifyContent: "center",
+          alignItems: "center",
+          gap: 8,
+          flexWrap: "wrap",
         }}
       >
-        {/* Menú */}
-        <div
+        <button
+          className="btn-nav"
+          type="button"
+          onClick={() => goTo("/")}
           style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "nowrap",
-            overflowX: "auto",
-            WebkitOverflowScrolling: "touch",
+            padding: "6px 12px",
+            fontSize: 13,
+            height: 32,
+            borderRadius: 0,
+            border: pathname === "/" ? "1px solid #1d4ed8" : "1px solid transparent",
+            backgroundColor: pathname === "/" ? "#1d4ed8" : "transparent",
+            color: pathname === "/" ? "#ffffff" : "inherit",
+            fontWeight: pathname === "/" ? 600 : 400,
+            whiteSpace: "nowrap",
           }}
         >
-          {NAV_LINKS.map((link) => {
-            const active = isActive(link.href);
+          Home
+        </button>
 
-            const baseStyle: React.CSSProperties = {
-              padding: "6px 12px",
-              fontSize: 13,
-              height: 32,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 0,
-              border: "1px solid transparent",
-              whiteSpace: "nowrap",
-            };
+        {NAV_GROUPS.map((group) => {
+          const active = groupIsActive(group);
+          const open = openMenu === group.label;
 
-            let style: React.CSSProperties = { ...baseStyle };
-
-            if (link.isFundamental) {
-              style = {
-                ...style,
-                backgroundColor: "#da3c3c",
-                borderColor: "#da3c3c",
-                color: "#ffffff",
-                fontWeight: 600,
-              };
-            } else if (active) {
-              style = {
-                ...style,
-                backgroundColor: "#1d4ed8",
-                borderColor: "#1d4ed8",
-                color: "#ffffff",
-                fontWeight: 600,
-              };
-            }
-
-            return (
+          return (
+            <div
+                key={group.label}
+                style={{
+                    position: "relative",
+                    paddingBottom: 6,
+            }}
+            onMouseEnter={() => setOpenMenu(group.label)}
+            onMouseLeave={() => setOpenMenu(null)}
+            >
               <button
-                key={link.href}
                 className="btn-nav"
-                style={style}
-                onClick={() => router.push(link.href)}
                 type="button"
+                onClick={() => setOpenMenu(open ? null : group.label)}
+                style={{
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  height: 32,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  borderRadius: 0,
+                  border: active ? "1px solid #1d4ed8" : "1px solid transparent",
+                  backgroundColor: active ? "#1d4ed8" : "transparent",
+                  color: active ? "#ffffff" : "inherit",
+                  fontWeight: active ? 600 : 400,
+                  whiteSpace: "nowrap",
+                }}
               >
-                {link.label}
+                {group.label}
+                <span style={{ fontSize: 10, opacity: 0.8 }}>▾</span>
               </button>
-            );
-          })}
-        </div>
+
+              {open && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    minWidth: 170,
+                    background: "#020617",
+                    border: "1px solid #1f2937",
+                    boxShadow: "0 14px 30px rgba(0,0,0,0.35)",
+                    padding: 6,
+                    zIndex: 100,
+                  }}
+                >
+                  {group.items.map((item) => {
+                    const itemActive = isActive(item.href);
+
+                    return (
+                      <button
+                        key={item.href}
+                        type="button"
+                        onClick={() => goTo(item.href)}
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          textAlign: "left",
+                          padding: "8px 10px",
+                          fontSize: 13,
+                          border: "1px solid transparent",
+                          backgroundColor: item.isFundamental
+                            ? "#da3c3c"
+                            : itemActive
+                            ? "#1d4ed8"
+                            : "transparent",
+                          color:
+                            item.isFundamental || itemActive
+                              ? "#ffffff"
+                              : "#cbd5e1",
+                          fontWeight:
+                            item.isFundamental || itemActive ? 600 : 400,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!itemActive && !item.isFundamental) {
+                            e.currentTarget.style.backgroundColor = "#111827";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!itemActive && !item.isFundamental) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </nav>
   );
 }
-

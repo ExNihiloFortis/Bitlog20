@@ -101,8 +101,13 @@ const INITIAL_VALUES: TradeFormValues = {
   ea_tp3: "",
   ea_sl1: "",
   ea_score: "",
-  notas: `Descripción:
-1. (Por qué entré en este trade?)
+  notas: `☑️ ESTA LA GANE!!! 💪❤️‍🔥🔥
+❌ ESTA LA PERDI   ☹️😵😵‍💫
+🙏 ESTA QUEDE EN BE,❤️ NO PERDI 👍
+
+Descripción
+Por qué entré en este trade?:
+1. 
 
 
 
@@ -144,8 +149,18 @@ Cosas en las que Mejorar💪:
 
 
 3.
------------------------------`,
-};
+-----------------
+Notas:
+
+1.
+
+
+2.
+
+
+3.
+
+-----------------`};
 
 // ===================== [N6] Página Nuevo Trade =====================
 export default function TradeNewPage() {

@@ -16,6 +16,67 @@ type Opt = { id?: number; label: string };
 // ===================== [TF3] Constantes UI =====================
 const SESSIONS = ["Sydney", "Tokyo", "London", "New York", "After-Hours"] as const;
 
+const DEFAULT_TRADE_NOTES = `☑️ ESTA LA GANE!!! 💪❤️‍🔥🔥
+❌ ESTA LA PERDI   ☹️😵😵‍💫
+🙏 ESTA QUEDE EN BE,❤️ NO PERDI 👍
+
+Descripción
+Por qué entré en este trade?:
+1. 
+
+
+
+2. Seguí mi estrategia en este trade?
+Explicación:
+
+
+
+-------------
+✅✅✅
+Cosas que hice bien:
+
+1.
+
+2.
+
+3.
+
+4.
+------------
+❌❌❌
+Cosas que hice mal:
+
+1.
+
+2.
+
+3.
+
+4.
+
+-----------------
+Cosas en las que Mejorar💪:
+
+1.
+
+
+2.
+
+
+3.
+-----------------
+Notas:
+
+1.
+
+
+2.
+
+
+3.
+
+-----------------`;
+
 const EMO_POS = [
   "Alegría",
   "Calma",
@@ -161,7 +222,11 @@ export default function TradeForm(props: TradeFormProps) {
     ea: initialValues?.ea ?? "",
     tendencia: initialValues?.tendencia ?? "",
     pnl_usd_gross: initialValues?.pnl_usd_gross ?? "",
-    notas: initialValues?.notas ?? "",
+    
+    
+    
+    
+    notas: mode === "create" ? initialValues?.notas || DEFAULT_TRADE_NOTES : initialValues?.notas ?? "",
 
     close_reason: initialValues?.close_reason ?? "",
 
@@ -177,15 +242,20 @@ export default function TradeForm(props: TradeFormProps) {
   // ---------- [TF6.4] Sincronizar cuando cambien initialValues ----------
   useEffect(() => {
     if (!initialValues) return;
+
     setForm((prev) => ({
       ...prev,
       ...initialValues,
+      notas:
+        mode === "create"
+          ? initialValues?.notas || DEFAULT_TRADE_NOTES
+          : initialValues?.notas ?? prev.notas,
       session:
         ((initialValues.session as TradeFormState["session"]) ??
           prev.session ??
           "London") as TradeFormState["session"],
     }));
-  }, [initialValues]);
+  }, [initialValues, mode]);
 
   // ---------- [TF6.5] Cargar catálogos ----------
   useEffect(() => {
@@ -580,7 +650,7 @@ export default function TradeForm(props: TradeFormProps) {
             <textarea
               ref={notesRef}
               className="textarea"
-              rows={3}
+              rows={24}
               value={form.notas}
               onChange={(e) => onChange("notas", e.target.value)}
               disabled={disabled}
