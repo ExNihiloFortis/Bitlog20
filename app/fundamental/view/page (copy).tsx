@@ -1,4 +1,3 @@
-// app/fundamental/view/page.tsx
 import React, { Suspense } from "react";
 import TopNav from "@/components/TopNav";
 import FundamentalViewClient from "./FundamentalViewClient";
@@ -8,12 +7,19 @@ export const revalidate = 0;
 
 export default function FundamentalViewPage() {
   return (
-    <div style={{ minHeight: "100vh", background: "#020617" }}>
+    <div style={{ minHeight: "100vh", background: "#000" }}>
       <TopNav />
-      <main className="container" style={{ paddingTop: 24, paddingBottom: 40 }}>
+      <main className="container" style={{ paddingTop: 24 }}>
         <Suspense
           fallback={
-            <div style={{ maxWidth: 980, margin: "0 auto", color: "#9ca3af", fontSize: 14 }}>
+            <div
+              style={{
+                maxWidth: 900,
+                margin: "0 auto",
+                color: "#9ca3af",
+                fontSize: 14,
+              }}
+            >
               Cargando artículo fundamental...
             </div>
           }
@@ -24,3 +30,4 @@ export default function FundamentalViewPage() {
     </div>
   );
 }
+
