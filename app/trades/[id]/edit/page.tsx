@@ -37,6 +37,10 @@ type Trade = {
   volume: number | null;
   pnl_usd_gross: number | null;
 
+  stochastic_k: number | null;
+  stochastic_d: number | null;
+  rsi_value: number | null;
+
   pips: number | null;
   rr_objetivo: string | null;
 
@@ -127,6 +131,10 @@ export default function TradeEditPage() {
       pnl_usd_gross: toNumber(values.pnl_usd_gross),
       volume: toNumber(values.volume),
 
+      stochastic_k: toNumber(values.stochastic_k),
+      stochastic_d: toNumber(values.stochastic_d),
+      rsi_value: toNumber(values.rsi_value),
+
       emocion: values.emocion || null,
       side: values.side || null,
 
@@ -199,6 +207,10 @@ const initialValues = {
   rr_objetivo: f.rr_objetivo ?? "",
   pnl_usd_gross: f.pnl_usd_gross != null ? String(f.pnl_usd_gross) : "",
   volume: f.volume != null ? String(f.volume) : "",
+
+  stochastic_k: f.stochastic_k != null ? String(f.stochastic_k) : "",
+  stochastic_d: f.stochastic_d != null ? String(f.stochastic_d) : "",
+  rsi_value: f.rsi_value != null ? String(f.rsi_value) : "",
 
   emocion: f.emocion ?? "",
   side: f.side ?? "",

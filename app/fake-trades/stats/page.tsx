@@ -4,6 +4,37 @@ import { useEffect, useMemo, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { supabase } from "@/lib/supabaseClient";
 
+function pct(n: number) { return `${n.toFixed(1)}%`; }
+function group(rows: any[], keyFn: (r: any) => string) {
+  return Object.entries(rows.reduce((a: any, r) => {
+    const k = keyFn(r) || "—";
+    if (!a[k]) a[k] = { total: 0, win: 0, loss: 0, neutral: 0, pending: 0 };
+    a[k].total += 1;
+    if (r.result === "WIN") a[k].win += 1;
+    if (r.result === "LOSS") a[k].loss += 1;
+    if (r.result === "NEUTRAL") a[k].neutral += 1;
+    if (r.result === "PENDING") a[k].pending += 1;
+    return a;
+  }, {})).map(([k, v]: any) => {
+    const closed = v.win + v.loss;
+    return { k, ...v, winRate: closed > 0 ? (v.win / closed) * 100 : 0 };
+  }).sort((a: any, b: any) => b.total - a.total);
+}
+
+function StatTable({ title, rows }: { title: string; rows: any[] }) {
+  return (
+    <div className="card" style={{ padding: 16 }}>
+      <h2 className="title" style={{ fontSize: 18 }}>{title}</h2>
+      <table className="tbl">
+        <thead><tr><th>Grupo</th><th>Total</th><th>Win</th><th>Loss</th><th>Pend.</th><th>Winrate</th></tr></thead>
+        <tbody>
+          {rows.map((r) => <tr key={r.k}><td>{r.k}</td><td className="num">{r.total}</td><td className="num">{r.win}</td><td className="num">{r.loss}</td><td className="num">{r.pending}</td><td className="num">{pct(r.winRate)}</td></tr>)}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function FakeTradeStatsPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -12,7 +43,7 @@ export default function FakeTradeStatsPage() {
     (async () => {
       const { data, error } = await supabase
         .from("fake_trades")
-        .select("id,symbol,result,source_type,source_name,pattern_name,timeframe,created_at")
+        .select("id,symbol,result,source_type,source_name,pattern_name,timeframe,tendencia,session,candle_name,ea,rsi_value,stochastic_k,adx,rvol,created_at")
         .order("created_at", { ascending: false });
       if (error) alert("Error cargando stats: " + error.message);
       setRows(data || []);
@@ -22,15 +53,36 @@ export default function FakeTradeStatsPage() {
 
   const s = useMemo(() => {
     const total = rows.length;
-    const closed = rows.filter((r) => ["WIN", "LOSS", "NEUTRAL"].includes(r.result));
     const win = rows.filter((r) => r.result === "WIN").length;
     const loss = rows.filter((r) => r.result === "LOSS").length;
     const pending = rows.filter((r) => r.result === "PENDING").length;
     const neutral = rows.filter((r) => r.result === "NEUTRAL").length;
     const winRate = win + loss > 0 ? (win / (win + loss)) * 100 : 0;
-    const bySource = Object.entries(rows.reduce((a: any, r) => { const k = r.source_type === "EXTERNA" ? (r.source_name || "Externa") : "Propia"; a[k] = (a[k] || 0) + 1; return a; }, {})).sort((a: any, b: any) => b[1] - a[1]);
-    const byPattern = Object.entries(rows.reduce((a: any, r) => { const k = r.pattern_name || "Sin patrón"; a[k] = (a[k] || 0) + 1; return a; }, {})).sort((a: any, b: any) => b[1] - a[1]);
-    return { total, closed: closed.length, win, loss, pending, neutral, winRate, bySource, byPattern };
+    return {
+      total, win, loss, pending, neutral, winRate,
+      bySource: group(rows, (r) => r.source_type === "EXTERNA" ? (r.source_name || "Externa") : "Propia"),
+      byPattern: group(rows, (r) => r.pattern_name || "Sin patrón"),
+      byTimeframe: group(rows, (r) => r.timeframe || "Sin TF"),
+      byTrend: group(rows, (r) => r.tendencia || "Sin tendencia"),
+      bySession: group(rows, (r) => r.session || "Sin sesión"),
+      byCandle: group(rows, (r) => r.candle_name || "Sin vela"),
+      byEA: group(rows, (r) => r.ea || "Sin EA/IA"),
+      byRvol: group(rows, (r) => {
+        const v = Number(r.rvol);
+        if (Number.isNaN(v)) return "Sin RVOL";
+        if (v >= 2) return "RVOL >= 2";
+        if (v >= 1.5) return "RVOL 1.5-1.99";
+        if (v >= 1) return "RVOL 1-1.49";
+        return "RVOL < 1";
+      }),
+      byAdx: group(rows, (r) => {
+        const v = Number(r.adx);
+        if (Number.isNaN(v)) return "Sin ADX";
+        if (v >= 25) return "ADX >= 25";
+        if (v >= 20) return "ADX 20-24.99";
+        return "ADX < 20";
+      }),
+    };
   }, [rows]);
 
   const Card = ({ label, value }: { label: string; value: any }) => (
@@ -55,18 +107,19 @@ export default function FakeTradeStatsPage() {
                 <Card label="No cumplidos" value={s.loss} />
                 <Card label="Pendientes" value={s.pending} />
                 <Card label="Neutrales" value={s.neutral} />
-                <Card label="Winrate" value={`${s.winRate.toFixed(1)}%`} />
+                <Card label="Winrate" value={pct(s.winRate)} />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-                <div className="card" style={{ padding: 16 }}>
-                  <h2 className="title" style={{ fontSize: 18 }}>Por fuente</h2>
-                  <table className="tbl"><tbody>{s.bySource.map(([k, v]: any) => <tr key={k}><td>{k}</td><td className="num">{v}</td></tr>)}</tbody></table>
-                </div>
-                <div className="card" style={{ padding: 16 }}>
-                  <h2 className="title" style={{ fontSize: 18 }}>Por patrón</h2>
-                  <table className="tbl"><tbody>{s.byPattern.map(([k, v]: any) => <tr key={k}><td>{k}</td><td className="num">{v}</td></tr>)}</tbody></table>
-                </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 16, marginTop: 16 }}>
+                <StatTable title="Por fuente" rows={s.bySource} />
+                <StatTable title="Por patrón" rows={s.byPattern} />
+                <StatTable title="Por timeframe" rows={s.byTimeframe} />
+                <StatTable title="Por tendencia" rows={s.byTrend} />
+                <StatTable title="Por sesión" rows={s.bySession} />
+                <StatTable title="Por vela" rows={s.byCandle} />
+                <StatTable title="Por EA / IA / Modelo" rows={s.byEA} />
+                <StatTable title="Por RVOL" rows={s.byRvol} />
+                <StatTable title="Por ADX" rows={s.byAdx} />
               </div>
             </>
           )}

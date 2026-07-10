@@ -44,6 +44,9 @@ const TRADE_COLS = new Set<string>([
   "entry_price",
   "exit_price",
   "close_reason",
+  "stochastic_k",
+  "stochastic_d",
+  "rsi_value",
 ]);
 
 // ===================== [N4] Tipo de valores del formulario =====================
@@ -63,6 +66,9 @@ type TradeFormValues = {
   rr_objective?: string | null;
   pnl_usd_gross?: string | number | null;
   volume?: string | number | null;
+  stochastic_k?: string | number | null;
+  stochastic_d?: string | number | null;
+  rsi_value?: string | number | null;
   emocion?: string | null;
   side?: "" | "BUY" | "SELL" | null;
   close_reason?: "" | "TP" | "SL" | "BREAKEVEN" | "TIME" | "OTHER" | null;
@@ -92,6 +98,9 @@ const INITIAL_VALUES: TradeFormValues = {
   rr_objective: "",
   pnl_usd_gross: "",
   volume: "",
+  stochastic_k: "",
+  stochastic_d: "",
+  rsi_value: "",
   emocion: "",
   side: "",
   close_reason: "",
@@ -225,6 +234,9 @@ export default function TradeNewPage() {
     put("pips", toNum(values.pips));
     put("pnl_usd_gross", toNum(values.pnl_usd_gross));
     put("volume", toNum(values.volume));
+    put("stochastic_k", toNum(values.stochastic_k));
+    put("stochastic_d", toNum(values.stochastic_d));
+    put("rsi_value", toNum(values.rsi_value));
 
     // RR objetivo
     if (values.rr_objetivo) put("rr_objetivo", values.rr_objetivo);

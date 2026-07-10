@@ -12,6 +12,7 @@ type Row = {
   source_type: "PROPIA" | "EXTERNA" | null;
   source_name: string | null;
   pattern_name: string | null;
+  tendencia: string | null;
   result: "PENDING" | "WIN" | "LOSS" | "NEUTRAL" | null;
   setup_datetime: string | null;
   created_at: string | null;
@@ -37,8 +38,10 @@ export default function FakeTradesPage() {
   const [err, setErr] = React.useState<string | null>(null);
   const [total, setTotal] = React.useState(0);
   const [symbols, setSymbols] = React.useState<string[]>([]);
+  const [sources, setSources] = React.useState<string[]>([]);
   const [fSymbol, setFSymbol] = React.useState("");
   const [fResult, setFResult] = React.useState("");
+  const [fSource, setFSource] = React.useState("");
   const [qId, setQId] = React.useState("");
   const [noMore, setNoMore] = React.useState(false);
 
@@ -54,6 +57,8 @@ export default function FakeTradesPage() {
       }
       const { data: sym } = await supabase.from("fake_trades").select("symbol").not("symbol", "is", null);
       setSymbols(Array.from(new Set((sym || []).map((x: any) => x.symbol))).filter(Boolean).sort());
+      const { data: src } = await supabase.from("fake_trades").select("source_name").not("source_name", "is", null);
+      setSources(Array.from(new Set((src || []).map((x: any) => x.source_name))).filter(Boolean).sort());
       await applyFilters(undefined, true);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
@@ -65,9 +70,11 @@ export default function FakeTradesPage() {
   function applyCommon(q: any, ov?: any) {
     const symbol = ov?.fSymbol ?? fSymbol;
     const result = ov?.fResult ?? fResult;
+    const source = ov?.fSource ?? fSource;
     const idRaw = (ov?.qId ?? qId).trim();
     if (symbol) q = q.eq("symbol", symbol);
     if (result) q = q.eq("result", result);
+    if (source) q = q.eq("source_name", source);
     if (idRaw && /^\d+$/.test(idRaw)) q = q.eq("id", Number(idRaw));
     return q;
   }
@@ -87,7 +94,7 @@ export default function FakeTradesPage() {
     try {
       let q = supabase
         .from("fake_trades")
-        .select("id,symbol,side,timeframe,source_type,source_name,pattern_name,result,setup_datetime,created_at")
+        .select("id,symbol,side,timeframe,source_type,source_name,pattern_name,tendencia,result,setup_datetime,created_at")
         .order("created_at", { ascending: false })
         .order("id", { ascending: false });
       q = applyCommon(q, ov);
@@ -106,14 +113,14 @@ export default function FakeTradesPage() {
 
   async function applyFilters(e?: React.FormEvent, first = false) {
     e?.preventDefault();
-    const ov = first ? { fSymbol: "", fResult: "", qId: "" } : undefined;
+    const ov = first ? { fSymbol: "", fResult: "", fSource: "", qId: "" } : undefined;
     await fetchTotal(ov);
     await loadPage(true, ov);
   }
 
   async function clearFilters() {
-    setFSymbol(""); setFResult(""); setQId(""); setNoMore(false);
-    const ov = { fSymbol: "", fResult: "", qId: "" };
+    setFSymbol(""); setFResult(""); setFSource(""); setQId(""); setNoMore(false);
+    const ov = { fSymbol: "", fResult: "", fSource: "", qId: "" };
     await fetchTotal(ov);
     await loadPage(true, ov);
   }
@@ -152,6 +159,13 @@ export default function FakeTradesPage() {
               </select>
             </div>
             <div>
+              <label className="small">Fuente</label>
+              <select className="select" value={fSource} onChange={(e) => setFSource(e.target.value)}>
+                <option value="">(Todas)</option>
+                {sources.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="small">Resultado</label>
               <select className="select" value={fResult} onChange={(e) => setFResult(e.target.value)}>
                 <option value="">(Todos)</option>
@@ -176,7 +190,7 @@ export default function FakeTradesPage() {
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>ID</th><th>Símbolo</th><th>Lado</th><th>TF</th><th>Origen</th><th>Patrón</th><th>Fecha</th><th>Resultado</th><th>Acciones</th>
+                  <th>ID</th><th>Símbolo</th><th>Lado</th><th>TF</th><th>Fuente</th><th>Patrón</th><th>Tendencia</th><th>Fecha</th><th>Resultado</th><th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -188,6 +202,7 @@ export default function FakeTradesPage() {
                     <td>{r.timeframe}</td>
                     <td>{r.source_type === "EXTERNA" ? (r.source_name || "Externa") : "Propia"}</td>
                     <td>{r.pattern_name}</td>
+                    <td>{r.tendencia}</td>
                     <td>{asDT(r.setup_datetime || r.created_at)}</td>
                     <td>{badge(r.result)}</td>
                     <td className="actions" style={{ display: "flex", gap: 8 }}>
@@ -196,7 +211,7 @@ export default function FakeTradesPage() {
                     </td>
                   </tr>
                 ))}
-                {!rows.length && !loading && <tr><td colSpan={9} style={{ textAlign: "center", padding: 16, color: "#9ca3af" }}>Sin datos</td></tr>}
+                {!rows.length && !loading && <tr><td colSpan={10} style={{ textAlign: "center", padding: 16, color: "#9ca3af" }}>Sin datos</td></tr>}
               </tbody>
             </table>
           </div>

@@ -1,4 +1,4 @@
-// ===================== [IM-1] components/FakeTradeImageManager.tsx =====================
+// ===================== [FTIM-1] components/FakeTradeImageManager.tsx =====================
 // Carrusel centrado fijo + títulos editables en thumbnails
 //  - Modal SIEMPRE centrado (fixed + translate).
 //  - Header y footer fijos en el modal.
@@ -22,7 +22,7 @@ type ImgRow = {
 };
 
 type Props = {
-  fakeTradeId: number | null;            // null = NEW (cola local)
+  fakeTradeId: number | null;        // null = NEW (cola local)
   userId: string;
   readOnly?: boolean;
   onQueueChange?: (blobs: Blob[]) => void;
@@ -43,6 +43,8 @@ export default function FakeTradeImageManager({
   // Carrusel
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIdx, setViewerIdx] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [viewerSize, setViewerSize] = useState<"sm" | "md" | "lg">("md");
 
   // Control de título editable por índice (siempre visible)
   const [titleDrafts, setTitleDrafts] = useState<Record<string, string>>({});
@@ -246,6 +248,7 @@ export default function FakeTradeImageManager({
 async function remove(id?: number, src?: string) {
   if (readOnly) return;
 
+  // NEW: sólo limpiamos cola local.
   if (!fakeTradeId) {
     if (src) {
       setQueuedUrls((prev) => prev.filter((u) => u !== src));
@@ -266,14 +269,18 @@ async function remove(id?: number, src?: string) {
       .maybeSingle();
 
     if (readError) throw readError;
+
     if (img?.storage_path) {
-      await supabase.storage.from("journal").remove([img.storage_path]);
+      const rm = await supabase.storage.from("journal").remove([img.storage_path]);
+      if (rm.error) throw rm.error;
     }
 
     const { error } = await supabase.from("fake_trade_images").delete().eq("id", id);
     if (error) throw error;
+
     await loadFromDb();
   } catch (e: any) {
+    console.error("fake_trade_images delete error", e);
     alert("Error borrando imagen: " + (e?.message ?? e));
   }
 }
@@ -321,19 +328,49 @@ async function remove(id?: number, src?: string) {
   // ===================== [IM-5] Carrusel =====================
   function openViewer(i: number) {
     setViewerIdx(i);
+    setZoom(1);
     setViewerOpen(true);
     document.body.style.overflow = "hidden";
   }
   function closeViewer() {
     setViewerOpen(false);
+    setZoom(1);
     document.body.style.overflow = "";
   }
   function prev() {
     setViewerIdx((i) => (i - 1 + rows.length) % rows.length);
+    setZoom(1);
   }
   function next() {
     setViewerIdx((i) => (i + 1) % rows.length);
+    setZoom(1);
   }
+  function zoomIn() {
+    setZoom((z) => Math.min(4, Math.round((z + 0.25) * 100) / 100));
+  }
+  function zoomOut() {
+    setZoom((z) => Math.max(1, Math.round((z - 0.25) * 100) / 100));
+  }
+  function resetZoom() {
+    setZoom(1);
+  }
+
+  const viewerSizeStyle = {
+    sm: { width: "min(1000px, 70vw)", height: "min(72vh, 760px)" },
+    md: { width: "min(1250px, 85vw)", height: "min(86vh, 900px)" },
+    lg: { width: "min(1600px, 96vw)", height: "min(96vh, 1050px)" },
+  }[viewerSize];
+
+  const sizeButtonStyle = (size: "sm" | "md" | "lg"): React.CSSProperties => ({
+    padding: "4px 8px",
+    fontSize: 12,
+    minWidth: 34,
+    height: 30,
+    borderRadius: 6,
+    border: viewerSize === size ? "1px solid #60a5fa" : "1px solid rgba(255,255,255,0.18)",
+    background: viewerSize === size ? "rgba(37,99,235,0.35)" : "transparent",
+    color: viewerSize === size ? "#ffffff" : "inherit",
+  });
 
   useEffect(() => {
     if (!viewerOpen) return;
@@ -341,10 +378,13 @@ async function remove(id?: number, src?: string) {
       if (e.key === "Escape") closeViewer();
       else if (e.key === "ArrowLeft") prev();
       else if (e.key === "ArrowRight") next();
+      else if (e.key === "+" || e.key === "=") zoomIn();
+      else if (e.key === "-" || e.key === "_") zoomOut();
+      else if (e.key === "0") resetZoom();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [viewerOpen]);
+  }, [viewerOpen, rows.length]);
 
   // ===================== [IM-6] Render =====================
   return (
@@ -461,8 +501,8 @@ async function remove(id?: number, src?: string) {
               top: "50%",
               left: "50%",
               transform: "translate(-50%, -50%)",
-              width: "min(1000px, 92vw)",
-              height: "min(90vh, 820px)",
+              width: viewerSizeStyle.width,
+              height: viewerSizeStyle.height,
               zIndex: 1001,
             }}
           >
@@ -498,12 +538,47 @@ async function remove(id?: number, src?: string) {
               
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button className="btn" onClick={prev} aria-label="Anterior">←</button>
-                  
+                  <button className="btn" onClick={zoomOut} aria-label="Alejar">−</button>
+                  <button className="btn" onClick={resetZoom} aria-label="Restablecer zoom">
+                    {Math.round(zoom * 100)}%
+                  </button>
+                  <button className="btn" onClick={zoomIn} aria-label="Acercar">+</button>
+
                 </div>
                 
                 
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button className="btn" onClick={next} aria-label="Siguiente">→</button>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => setViewerSize("sm")}
+                    style={sizeButtonStyle("sm")}
+                    aria-label="Tamaño chico"
+                    title="Chico"
+                  >
+                    Ch
+                  </button>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => setViewerSize("md")}
+                    style={sizeButtonStyle("md")}
+                    aria-label="Tamaño mediano"
+                    title="Mediano"
+                  >
+                    Med
+                  </button>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => setViewerSize("lg")}
+                    style={sizeButtonStyle("lg")}
+                    aria-label="Tamaño grande"
+                    title="Grande"
+                  >
+                    Gde
+                  </button>
                   <button className="btn" onClick={closeViewer} aria-label="Cerrar">Cerrar</button>
                 </div>
               </div>
@@ -511,23 +586,34 @@ async function remove(id?: number, src?: string) {
               {/* BODY (scrollea solo la imagen) */}
               <div
                 className="modal-body"
+                onWheel={(e) => {
+                  if (!e.ctrlKey && !e.metaKey) return;
+                  e.preventDefault();
+                  if (e.deltaY < 0) zoomIn();
+                  else zoomOut();
+                }}
                 style={{
                   flex: "1 1 auto",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  alignItems: zoom === 1 ? "center" : "flex-start",
+                  justifyContent: zoom === 1 ? "center" : "flex-start",
                   overflow: "auto",
                   padding: 10,
                 }}
               >
                 <img
+                  onClick={zoomIn}
                   src={rows[viewerIdx].signed ?? rows[viewerIdx].external_url ?? rows[viewerIdx].blobUrl ?? ""}
                   alt=""
                   style={{
-                    maxWidth: "calc(100% - 20px)",
-                    maxHeight: "calc(100% - 20px)",
+                    maxWidth: zoom === 1 ? "calc(100% - 20px)" : "none",
+                    maxHeight: zoom === 1 ? "calc(100% - 20px)" : "none",
+                    width: zoom === 1 ? "auto" : `${zoom * 100}%`,
+                    height: "auto",
                     objectFit: "contain",
                     display: "block",
+                    cursor: "zoom-in",
+                    userSelect: "none",
                   }}
                 />
               </div>

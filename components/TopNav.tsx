@@ -40,6 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/whatif", label: "What If" },
       { href: "/journal", label: "Journal" },
       { href: "/charts", label: "Charts" },
+      { href: "/fake-trades/charts", label: "Charts Fake Trades" }, // <-- NUEVO      
       { href: "/fundamental", label: "News", isFundamental: true },
       { href: "/field-edits", label: "Field Edits" },
       { href: "/import", label: "Import" },

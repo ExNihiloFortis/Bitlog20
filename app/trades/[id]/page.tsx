@@ -121,6 +121,7 @@ export default function TradeShowPage() {
           entry_price, exit_price, volume, pnl_usd_gross,
           patron, vela, pips, rr_objetivo, tendencia, emocion,
           ea, ea_signal, ea_tp1, ea_tp2, ea_tp3, ea_sl1, ea_score,
+          stochastic_k, stochastic_d, rsi_value,
           dt_open_utc, dt_close_utc,
           close_reason, swap, equity_usd, margin_level, notes, created_at
         `
@@ -262,6 +263,9 @@ export default function TradeShowPage() {
             <Field label="R objetivo" value={t.rr_objetivo} />
             <Field label="Tendencia" value={t.tendencia} />
             <Field label="Emoción" value={t.emocion} />
+            <Field label="Estocástico K%" value={fmtNum(t.stochastic_k)} />
+            <Field label="Estocástico D%" value={fmtNum(t.stochastic_d)} />
+            <Field label="RSI" value={fmtNum(t.rsi_value)} />
           </div>
 
           {/* COLUMNA DER */}

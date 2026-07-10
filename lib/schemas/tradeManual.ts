@@ -33,6 +33,9 @@ export const manualTradeSchema = z.object({
   pips: z.coerce.number().finite().nullable().optional(),
   r_target: z.coerce.number().finite().nullable().optional(),
   pnl_usd_net: z.coerce.number().finite().nullable().optional(), // $P&L (neto)
+  stochastic_k: z.coerce.number().min(0).max(100).nullable().optional(),
+  stochastic_d: z.coerce.number().min(0).max(100).nullable().optional(),
+  rsi_value: z.coerce.number().min(0).max(100).nullable().optional(),
 
   // Imágenes: guardamos solo URLs (evita storage pesado)
   image_urls: z.array(z.string().url()).max(50).nullable().optional(),
@@ -43,6 +46,7 @@ export type ManualTradeInput = z.infer<typeof manualTradeSchema>;
 // Campos manuales (para UPDATE selectivo al existir ticket)
 export const MANUAL_FIELDS: (keyof ManualTradeInput)[] = [
   "timeframe","session","ea","pattern","trend","candle","symbol",
-  "emotion","notes","pips","r_target","pnl_usd_net","image_urls",
+  "emotion","notes","pips","r_target","pnl_usd_net",
+  "stochastic_k","stochastic_d","rsi_value","image_urls",
 ];
 

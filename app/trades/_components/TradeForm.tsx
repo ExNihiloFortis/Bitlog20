@@ -112,6 +112,9 @@ type TradeFormState = {
   entry_price: string;
   pips: string;
   volume: string;
+  stochastic_k: string;
+  stochastic_d: string;
+  rsi_value: string;
 
   // Col 2
   symbol: string;
@@ -208,6 +211,9 @@ export default function TradeForm(props: TradeFormProps) {
     entry_price: initialValues?.entry_price ?? "",
     pips: initialValues?.pips ?? "",
     volume: initialValues?.volume ?? "",
+    stochastic_k: initialValues?.stochastic_k ?? "",
+    stochastic_d: initialValues?.stochastic_d ?? "",
+    rsi_value: initialValues?.rsi_value ?? "",
 
     // Col 2
     symbol: initialValues?.symbol ?? "",
@@ -416,6 +422,39 @@ export default function TradeForm(props: TradeFormProps) {
               inputMode="decimal"
               value={form.volume}
               onChange={(e) => onChange("volume", e.target.value)}
+              disabled={disabled}
+            />
+          </div>
+
+          <div className="field">
+            <label className="label">Estocástico K%</label>
+            <input
+              className="input"
+              inputMode="decimal"
+              value={form.stochastic_k}
+              onChange={(e) => onChange("stochastic_k", e.target.value)}
+              disabled={disabled}
+            />
+          </div>
+
+          <div className="field">
+            <label className="label">Estocástico D%</label>
+            <input
+              className="input"
+              inputMode="decimal"
+              value={form.stochastic_d}
+              onChange={(e) => onChange("stochastic_d", e.target.value)}
+              disabled={disabled}
+            />
+          </div>
+
+          <div className="field">
+            <label className="label">RSI</label>
+            <input
+              className="input"
+              inputMode="decimal"
+              value={form.rsi_value}
+              onChange={(e) => onChange("rsi_value", e.target.value)}
               disabled={disabled}
             />
           </div>

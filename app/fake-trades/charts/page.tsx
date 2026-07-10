@@ -19,40 +19,47 @@ import {
   Line,
 } from "recharts";
 
-type TradeRow = {
+/* ===================== Tipos ===================== */
+
+type FakeTradeRow = {
   id: number;
-  ticket: string | null;
   symbol: string | null;
-  timeframe: string | null;
   side: string | null;
-  session: string | null;
-  dt_open_utc: string | null;
-  dt_close_utc: string | null;
-  volume: number | null;
-  entry_price: number | null;
-  exit_price: number | null;
-  pips: number | null;
-  rr_objetivo: string | null;
-  pnl_usd_gross: number | null;
-  pnl_usd_net: number | null;
-  fee_usd: number | null;
-  swap: number | null;
+  timeframe: string | null;
+  setup_datetime: string | null;
+  target_date: string | null;
+  source_type: string | null;
+  source_name: string | null;
+  source_url: string | null;
+  pattern_name: string | null;
+  candle_name: string | null;
   ea: string | null;
-  ea_signal: string | null;
-  ea_score: number | null;
-  ea_tp1: string | null;
-  ea_tp2: string | null;
-  ea_tp3: string | null;
-  ea_sl1: string | null;
-  patron: string | null;
-  vela: string | null;
+  entry_price: number | null;
+  stop_loss: number | null;
+  take_profit: number | null;
+  tp1: number | null;
+  tp2: number | null;
+  resistance: number | null;
+  pivot: number | null;
+  support: number | null;
   tendencia: string | null;
-  emocion: string | null;
-  notes: string | null;
-  close_reason: string | null;
+  session: string | null;
+  rsi_value: number | null;
   stochastic_k: number | null;
   stochastic_d: number | null;
-  rsi_value: number | null;
+  ema20: number | null;
+  ema50: number | null;
+  ema100: number | null;
+  ema200: number | null;
+  atr: number | null;
+  adx: number | null;
+  rvol: number | null;
+  expected_move: string | null;
+  failure_reason: string | null;
+  lessons_learned: string | null;
+  result: string | null;
+  notes: string | null;
+  created_at?: string | null;
 };
 
 type PerfRow = {
@@ -61,9 +68,11 @@ type PerfRow = {
   trades: number;
   wins: number;
   losses: number;
+  pending: number;
+  neutral: number;
   winRate: number;
-  pnl: number;
-  avgPnL: number;
+  expectancy: number;
+  avgDaysToTarget: number | null;
   score: number;
 };
 
@@ -71,39 +80,47 @@ type FilterPreset = {
   name: string;
   dateFrom: string;
   dateTo: string;
-  ea: string;
+  sourceType: string;
+  sourceName: string;
   symbol: string;
   tf: string;
   side: string;
   session: string;
-  emocion: string;
   patron: string;
   vela: string;
+  tendencia: string;
+  ea: string;
+  result: string;
   day: string;
   hour: string;
 };
 
 type DimensionKey =
-  | "ea"
+  | "sourceType"
+  | "sourceName"
   | "symbol"
   | "timeframe"
   | "session"
   | "day"
   | "hour"
   | "patron"
-  | "emocion"
-  | "side"
   | "vela"
+  | "tendencia"
+  | "ea"
+  | "side"
   | "rsiZone"
   | "stochKZone"
   | "stochDZone"
-  | "oscillatorConfluence";
+  | "oscillatorConfluence"
+  | "rvolZone"
+  | "adxZone"
+  | "emaContext";
 
-type MetricKey = "pnl" | "winRate" | "trades";
+type MetricKey = "winRate" | "expectancy" | "trades";
 
 type SortDir = "asc" | "desc";
 
-type MetricSortKey = "trades" | "wins" | "losses" | "winRate" | "pnl";
+type MetricSortKey = "trades" | "wins" | "losses" | "pending" | "winRate" | "expectancy";
 
 type SortState =
   | { colType: "part"; colIndex: number; dir: SortDir }
@@ -112,21 +129,23 @@ type SortState =
 
 type DetailSortKey =
   | "id"
-  | "ticket"
   | "symbol"
   | "timeframe"
   | "side"
   | "ea"
   | "session"
+  | "sourceName"
   | "patron"
   | "vela"
-  | "emocion"
-  | "open"
-  | "close"
+  | "tendencia"
+  | "setup"
+  | "target"
   | "rsi"
   | "stochK"
   | "stochD"
-  | "pnl";
+  | "result";
+
+/* ===================== Estilos (idénticos a page.tsx) ===================== */
 
 const CARD_STYLE: React.CSSProperties = {
   backgroundColor: "#111",
@@ -179,12 +198,14 @@ const ICON_BTN_STYLE: React.CSSProperties = {
 
 const GREEN = "#22c55e";
 const RED = "#ef4444";
+const AMBER = "#f59e0b";
 const NEUTRAL = "#737373";
 const GRID = "#2a2a2a";
 const AXIS = "#cfcfcf";
 
 const DIMENSION_OPTIONS: [DimensionKey, string][] = [
-  ["ea", "EA"],
+  ["sourceType", "Tipo de fuente"],
+  ["sourceName", "Fuente"],
   ["symbol", "Símbolo"],
   ["timeframe", "TF"],
   ["session", "Sesión"],
@@ -192,12 +213,16 @@ const DIMENSION_OPTIONS: [DimensionKey, string][] = [
   ["hour", "Hora"],
   ["patron", "Patrón"],
   ["vela", "Vela"],
-  ["emocion", "Emoción"],
+  ["tendencia", "Tendencia"],
+  ["ea", "EA"],
   ["side", "Dirección"],
   ["rsiZone", "Zona RSI"],
   ["stochKZone", "Zona Stoch K%"],
   ["stochDZone", "Zona Stoch D%"],
   ["oscillatorConfluence", "Confluencia RSI/Stoch"],
+  ["rvolZone", "Zona RVOL"],
+  ["adxZone", "Zona ADX"],
+  ["emaContext", "Contexto EMAs"],
 ];
 
 const DIMENSION_LABELS: Record<DimensionKey, string> = DIMENSION_OPTIONS.reduce(
@@ -231,6 +256,7 @@ function normalizeThreshold(value: number, fallback: number): number {
   return value;
 }
 
+/* ===================== Helpers de formato ===================== */
 
 function safeNumber(n: number | null | undefined): number {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return 0;
@@ -242,10 +268,10 @@ function fmtPct(p: number): string {
   return `${p.toFixed(1)}%`;
 }
 
-function fmtMoney(n: number): string {
-  if (!isFinite(n)) return "$0.00";
+function fmtScore(n: number): string {
+  if (!isFinite(n)) return "0";
   const sign = n >= 0 ? "" : "-";
-  return `${sign}$${Math.abs(n).toFixed(2)}`;
+  return `${sign}${Math.abs(n).toFixed(1)}`;
 }
 
 function fmtDateShort(s: string | null): string {
@@ -262,16 +288,10 @@ function fmtDateShort(s: string | null): string {
   });
 }
 
-function formatDurationHMS(ms: number): string {
-  if (!isFinite(ms) || ms <= 0) return "0s";
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const pad = (v: number) => v.toString().padStart(2, "0");
-  if (hours > 0) return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-  if (minutes > 0) return `${pad(minutes)}:${pad(seconds)} min`;
-  return `${seconds}s`;
+function fmtDays(d: number | null): string {
+  if (d === null || !isFinite(d)) return "—";
+  if (d < 1) return `${(d * 24).toFixed(1)} h`;
+  return `${d.toFixed(1)} d`;
 }
 
 function getTodayMazatlan(): string {
@@ -317,11 +337,33 @@ function getDayMazatlan(dateStr: string): string {
   }).format(d);
 }
 
+/* ===================== Lógica de dominio (fake trades) ===================== */
 
-function getRsiZone(
-  value: number | null | undefined,
-  thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS
-): string {
+function dateOf(t: FakeTradeRow): string | null {
+  return t.setup_datetime || t.created_at || null;
+}
+
+function daysToTarget(t: FakeTradeRow): number | null {
+  const a = dateOf(t);
+  const b = t.target_date;
+  if (!a || !b) return null;
+  const da = new Date(a).getTime();
+  const db = new Date(b).getTime();
+  if (Number.isNaN(da) || Number.isNaN(db) || db < da) return null;
+  return (db - da) / 86_400_000;
+}
+
+function resultKind(v: string | null | undefined): "WIN" | "LOSS" | "PENDING" | "NEUTRAL" {
+  const s = (v || "PENDING").trim().toUpperCase();
+  if (s.startsWith("SIN_") || s === "") return "PENDING";
+  if (s.includes("WIN") || s.includes("TP") || s === "CUMPLIDO" || s === "SUCCESS") return "WIN";
+  if (s.includes("LOSS") || s.includes("SL") || s === "FALLIDO" || s === "FAILED") return "LOSS";
+  if (s.includes("PENDING") || s === "ABIERTO" || s === "OPEN") return "PENDING";
+  if (s.includes("BE") || s.includes("NEUTRAL") || s === "BREAKEVEN") return "NEUTRAL";
+  return "PENDING";
+}
+
+function getRsiZone(value: number | null | undefined, thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS): string {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "SIN_RSI";
   const n = Number(value);
   if (n < thresholds.rsiOversold) return "Sobreventa";
@@ -329,10 +371,7 @@ function getRsiZone(
   return "Neutral";
 }
 
-function getStochasticZone(
-  value: number | null | undefined,
-  thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS
-): string {
+function getStochasticZone(value: number | null | undefined, thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS): string {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "SIN_STOCH";
   const n = Number(value);
   if (n < thresholds.stochOversold) return "Sobreventa";
@@ -340,78 +379,128 @@ function getStochasticZone(
   return "Neutral";
 }
 
-function getOscillatorConfluence(
-  t: TradeRow,
-  thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS
-): string {
+function getOscillatorConfluence(t: FakeTradeRow, thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS): string {
   const rsi = getRsiZone(t.rsi_value, thresholds);
   const stochK = getStochasticZone(t.stochastic_k, thresholds);
   if (rsi.startsWith("SIN_") || stochK.startsWith("SIN_")) return "SIN_CONFLUENCIA";
   return `RSI ${rsi} + Stoch K% ${stochK}`;
 }
 
-function getTradeDimensionValue(
-  t: TradeRow,
-  dim: DimensionKey,
-  thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS
-): string {
-  if (dim === "ea") return (t.ea || "SIN_EA").trim() || "SIN_EA";
+function getRvolZone(v: number | null | undefined): string {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return "SIN_RVOL";
+  const n = Number(v);
+  if (n < 1) return "< 1";
+  if (n < 1.5) return "1 – 1.49";
+  if (n < 2) return "1.5 – 1.99";
+  if (n < 3) return "2 – 2.99";
+  return "≥ 3";
+}
+
+function getAdxZone(v: number | null | undefined): string {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return "SIN_ADX";
+  const n = Number(v);
+  if (n < 20) return "< 20 sin tendencia";
+  if (n < 25) return "20 – 24.99 débil";
+  if (n < 40) return "25 – 39.99 fuerte";
+  return "≥ 40 muy fuerte";
+}
+
+function getEmaContext(t: FakeTradeRow): string {
+  const entry = t.entry_price;
+  const e20 = t.ema20;
+  const e50 = t.ema50;
+  const e100 = t.ema100;
+  const e200 = t.ema200;
+  const parts: string[] = [];
+  if (entry != null && e200 != null) parts.push(entry >= e200 ? "Precio ≥ EMA200" : "Precio < EMA200");
+  if (e20 != null && e50 != null) parts.push(e20 >= e50 ? "EMA20 ≥ EMA50" : "EMA20 < EMA50");
+  if (e50 != null && e100 != null) parts.push(e50 >= e100 ? "EMA50 ≥ EMA100" : "EMA50 < EMA100");
+  if (e100 != null && e200 != null) parts.push(e100 >= e200 ? "EMA100 ≥ EMA200" : "EMA100 < EMA200");
+  return parts.length ? parts.join(" | ") : "SIN_EMA";
+}
+
+function getTradeDimensionValue(t: FakeTradeRow, dim: DimensionKey, thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS): string {
+  if (dim === "sourceType") return (t.source_type || "SIN_TIPO").trim() || "SIN_TIPO";
+  if (dim === "sourceName") return (t.source_name || "SIN_FUENTE").trim() || "SIN_FUENTE";
   if (dim === "symbol") return (t.symbol || "SIN_SYMBOL").trim() || "SIN_SYMBOL";
   if (dim === "timeframe") return (t.timeframe || "SIN_TF").trim() || "SIN_TF";
   if (dim === "session") return (t.session || "SIN_SESION").trim() || "SIN_SESION";
-  if (dim === "patron") return (t.patron || "SIN_PATRON").trim() || "SIN_PATRON";
-  if (dim === "emocion") return (t.emocion || "SIN_EMOCION").trim() || "SIN_EMOCION";
+  if (dim === "patron") return (t.pattern_name || "SIN_PATRON").trim() || "SIN_PATRON";
+  if (dim === "vela") return (t.candle_name || "SIN_VELA").trim() || "SIN_VELA";
+  if (dim === "tendencia") return (t.tendencia || "SIN_TENDENCIA").trim() || "SIN_TENDENCIA";
+  if (dim === "ea") return (t.ea || "SIN_EA").trim() || "SIN_EA";
   if (dim === "side") return (t.side || "SIN_DIRECCION").trim().toUpperCase() || "SIN_DIRECCION";
-  if (dim === "vela") return (t.vela || "SIN_VELA").trim() || "SIN_VELA";
   if (dim === "rsiZone") return getRsiZone(t.rsi_value, thresholds);
   if (dim === "stochKZone") return getStochasticZone(t.stochastic_k, thresholds);
   if (dim === "stochDZone") return getStochasticZone(t.stochastic_d, thresholds);
   if (dim === "oscillatorConfluence") return getOscillatorConfluence(t, thresholds);
-  if (dim === "hour") return t.dt_open_utc ? `${String(getHourMazatlan(t.dt_open_utc)).padStart(2, "0")}:00` : "SIN_HORA";
-  if (dim === "day") return t.dt_open_utc ? getDayMazatlan(t.dt_open_utc) : "SIN_FECHA";
+  if (dim === "rvolZone") return getRvolZone(t.rvol);
+  if (dim === "adxZone") return getAdxZone(t.adx);
+  if (dim === "emaContext") return getEmaContext(t);
+  const d = dateOf(t);
+  if (dim === "hour") return d ? `${String(getHourMazatlan(d)).padStart(2, "0")}:00` : "SIN_HORA";
+  if (dim === "day") return d ? getDayMazatlan(d) : "SIN_FECHA";
   return "—";
 }
 
-function aggregateTrades(
-  trades: TradeRow[],
-  dimensions: DimensionKey[],
-  thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS
-): PerfRow[] {
-  const map = new Map<string, { parts: string[]; trades: number; wins: number; losses: number; pnl: number }>();
+function aggregateTrades(trades: FakeTradeRow[], dimensions: DimensionKey[], thresholds: OscillatorThresholds = DEFAULT_OSCILLATOR_THRESHOLDS): PerfRow[] {
+  const map = new Map<
+    string,
+    { parts: string[]; trades: number; wins: number; losses: number; pending: number; neutral: number; days: number[] }
+  >();
 
   trades.forEach((t) => {
     const parts = dimensions.map((d) => getTradeDimensionValue(t, d, thresholds));
     const key = parts.join(" + ");
-    if (!map.has(key)) map.set(key, { parts, trades: 0, wins: 0, losses: 0, pnl: 0 });
+    if (!map.has(key)) map.set(key, { parts, trades: 0, wins: 0, losses: 0, pending: 0, neutral: 0, days: [] });
     const rec = map.get(key)!;
-    const pnl = safeNumber(t.pnl_usd_gross);
+    const kind = resultKind(t.result);
     rec.trades += 1;
-    rec.pnl += pnl;
-    if (pnl > 0) rec.wins += 1;
-    else if (pnl < 0) rec.losses += 1;
+    if (kind === "WIN") rec.wins += 1;
+    else if (kind === "LOSS") rec.losses += 1;
+    else if (kind === "PENDING") rec.pending += 1;
+    else rec.neutral += 1;
+    const dtt = daysToTarget(t);
+    if (dtt !== null) rec.days.push(dtt);
   });
 
   const rows: PerfRow[] = [];
   map.forEach((v, key) => {
-    const winRate = v.trades > 0 ? (v.wins / v.trades) * 100 : 0;
-    const avgPnL = v.trades > 0 ? v.pnl / v.trades : 0;
+    const closed = v.wins + v.losses;
+    const winRate = closed > 0 ? (v.wins / closed) * 100 : 0;
+    const expectancy = closed > 0 ? ((v.wins - v.losses) / closed) * 100 : 0;
+    const avgDaysToTarget = v.days.length ? v.days.reduce((a, b) => a + b, 0) / v.days.length : null;
     const sampleFactor = Math.min(v.trades / 10, 1);
-    const score = winRate * 0.55 + Math.max(Math.min(avgPnL * 10, 30), -30) + sampleFactor * 15;
-    rows.push({ key, parts: v.parts, trades: v.trades, wins: v.wins, losses: v.losses, winRate, pnl: v.pnl, avgPnL, score });
+    const score = winRate * 0.55 + Math.max(Math.min(expectancy * 0.4, 30), -30) + sampleFactor * 15;
+    rows.push({
+      key,
+      parts: v.parts,
+      trades: v.trades,
+      wins: v.wins,
+      losses: v.losses,
+      pending: v.pending,
+      neutral: v.neutral,
+      winRate,
+      expectancy,
+      avgDaysToTarget,
+      score,
+    });
   });
 
   rows.sort((a, b) => {
-    if (b.pnl !== a.pnl) return b.pnl - a.pnl;
+    if (b.score !== a.score) return b.score - a.score;
     return b.trades - a.trades;
   });
   return rows;
 }
 
 function getQualityBadge(row: PerfRow, minTrades: number) {
+  const closed = row.wins + row.losses;
   if (row.trades < minTrades) return { label: "Muestra baja", bg: "#424242" };
-  if (row.pnl > 0 && row.winRate >= 60) return { label: "Fuerte", bg: "#166534" };
-  if (row.pnl > 0 && row.winRate >= 50) return { label: "Prometedor", bg: "#365314" };
-  if (row.pnl < 0 && row.winRate < 50) return { label: "Evitar", bg: "#991b1b" };
+  if (closed === 0) return { label: "Sin cierres", bg: "#374151" };
+  if (row.winRate >= 60 && closed >= minTrades) return { label: "Fuerte", bg: "#166534" };
+  if (row.winRate >= 50) return { label: "Prometedor", bg: "#365314" };
+  if (row.winRate < 50) return { label: "Evitar", bg: "#991b1b" };
   return { label: "Neutral", bg: "#374151" };
 }
 
@@ -615,17 +704,18 @@ function PerfTable({
 
   const handleExportTableCsv = () => {
     if (!displayRows.length) return;
-    const headers = [...columns, "Trades", "Wins", "Losses", "Win%", "PnL", "Calidad"];
+    const headers = [...columns, "Trades", "Wins", "Losses", "Pendientes", "Win%", "Expectancy", "Calidad"];
     const dataRows = displayRows.map((r) => [
       ...r.parts,
       r.trades,
       r.wins,
       r.losses,
+      r.pending,
       `${r.winRate.toFixed(1)}%`,
-      r.pnl.toFixed(2),
+      r.expectancy.toFixed(1),
       getQualityBadge(r, minTrades).label,
     ]);
-    downloadCsv(`bitlog_${idPrefix}.csv`, headers, dataRows);
+    downloadCsv(`bitlog_fake_${idPrefix}.csv`, headers, dataRows);
   };
 
   return (
@@ -662,11 +752,14 @@ function PerfTable({
               <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("losses")}>
                 Losses{arrowFor("losses")}
               </th>
+              <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("pending")}>
+                Pend.{arrowFor("pending")}
+              </th>
               <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("winRate")}>
                 Win%{arrowFor("winRate")}
               </th>
-              <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("pnl")}>
-                PnL{arrowFor("pnl")}
+              <th style={{ ...TH_STYLE, cursor: "pointer" }} onClick={() => handleSortMetric("expectancy")}>
+                Expectancy{arrowFor("expectancy")}
               </th>
               <th style={TH_STYLE}>Calidad</th>
             </tr>
@@ -693,8 +786,11 @@ function PerfTable({
                   <td style={rowStyle}>{row.trades}</td>
                   <td style={{ ...rowStyle, color: isSelected ? "#fff" : GREEN }}>{row.wins}</td>
                   <td style={{ ...rowStyle, color: isSelected ? "#fff" : RED }}>{row.losses}</td>
+                  <td style={{ ...rowStyle, color: isSelected ? "#fff" : AMBER }}>{row.pending}</td>
                   <td style={rowStyle}>{fmtPct(row.winRate)}</td>
-                  <td style={{ ...rowStyle, color: isSelected ? "#fff" : row.pnl > 0 ? GREEN : row.pnl < 0 ? RED : "#ccc" }}>{fmtMoney(row.pnl)}</td>
+                  <td style={{ ...rowStyle, color: isSelected ? "#fff" : row.expectancy > 0 ? GREEN : row.expectancy < 0 ? RED : "#ccc" }}>
+                    {fmtScore(row.expectancy)}
+                  </td>
                   <td style={rowStyle}>
                     <span style={{ ...BADGE_STYLE_BASE, backgroundColor: badge.bg, color: "#fff" }}>{badge.label}</span>
                   </td>
@@ -703,7 +799,7 @@ function PerfTable({
             })}
             {displayRows.length === 0 && (
               <tr>
-                <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={columns.length + 6}>
+                <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={columns.length + 7}>
                   Sin datos en este filtro.
                 </td>
               </tr>
@@ -715,20 +811,18 @@ function PerfTable({
   );
 }
 
-/* ===================== Tabla de detalle de trades: sort + highlight ===================== */
+/* ===================== Tabla de detalle de fake trades: sort + highlight ===================== */
 
-function TradeDetailTable({ trades }: { trades: TradeRow[] }) {
+function TradeDetailTable({ trades }: { trades: FakeTradeRow[] }) {
   const [sortKey, setSortKey] = useState<DetailSortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
 
-  const getSortValue = (t: TradeRow, key: DetailSortKey): string | number => {
+  const getSortValue = (t: FakeTradeRow, key: DetailSortKey): string | number => {
     switch (key) {
       case "id":
         return t.id;
-      case "ticket":
-        return t.ticket || "";
       case "symbol":
         return t.symbol || "";
       case "timeframe":
@@ -739,24 +833,26 @@ function TradeDetailTable({ trades }: { trades: TradeRow[] }) {
         return t.ea || "";
       case "session":
         return t.session || "";
+      case "sourceName":
+        return t.source_name || "";
       case "patron":
-        return t.patron || "";
+        return t.pattern_name || "";
       case "vela":
-        return t.vela || "";
-      case "emocion":
-        return t.emocion || "";
-      case "open":
-        return t.dt_open_utc ? new Date(t.dt_open_utc).getTime() : 0;
-      case "close":
-        return t.dt_close_utc ? new Date(t.dt_close_utc).getTime() : 0;
+        return t.candle_name || "";
+      case "tendencia":
+        return t.tendencia || "";
+      case "setup":
+        return dateOf(t) || "";
+      case "target":
+        return t.target_date || "";
       case "rsi":
         return safeNumber(t.rsi_value);
       case "stochK":
         return safeNumber(t.stochastic_k);
       case "stochD":
         return safeNumber(t.stochastic_d);
-      case "pnl":
-        return safeNumber(t.pnl_usd_gross);
+      case "result":
+        return resultKind(t.result);
       default:
         return "";
     }
@@ -788,22 +884,24 @@ function TradeDetailTable({ trades }: { trades: TradeRow[] }) {
 
   const columns: { key: DetailSortKey; label: string }[] = [
     { key: "id", label: "ID" },
-    { key: "ticket", label: "Ticket" },
     { key: "symbol", label: "Símbolo" },
     { key: "timeframe", label: "TF" },
     { key: "side", label: "Dirección" },
     { key: "ea", label: "EA" },
+    { key: "sourceName", label: "Fuente" },
     { key: "session", label: "Sesión" },
     { key: "patron", label: "Patrón" },
     { key: "vela", label: "Vela" },
-    { key: "emocion", label: "Emoción" },
-    { key: "open", label: "Open" },
-    { key: "close", label: "Close" },
+    { key: "tendencia", label: "Tendencia" },
+    { key: "setup", label: "Setup" },
+    { key: "target", label: "Target" },
     { key: "rsi", label: "RSI" },
     { key: "stochK", label: "Stoch K%" },
     { key: "stochD", label: "Stoch D%" },
-    { key: "pnl", label: "PnL" },
+    { key: "result", label: "Resultado" },
   ];
+
+  const resultColor = (kind: string) => (kind === "WIN" ? GREEN : kind === "LOSS" ? RED : kind === "PENDING" ? AMBER : "#ccc");
 
   return (
     <div style={CARD_STYLE}>
@@ -813,7 +911,7 @@ function TradeDetailTable({ trades }: { trades: TradeRow[] }) {
             ↺
           </button>
         )}
-        <h2 style={{ margin: 0, fontSize: 15 }}>Detalle de trades filtrados</h2>
+        <h2 style={{ margin: 0, fontSize: 15 }}>Detalle de fake trades filtrados</h2>
       </div>
       <div style={{ maxHeight: 360, overflow: "auto", borderRadius: 8, border: "1px solid #222" }}>
         <table style={TABLE_STYLE}>
@@ -830,7 +928,7 @@ function TradeDetailTable({ trades }: { trades: TradeRow[] }) {
           </thead>
           <tbody>
             {displayTrades.map((t, idx) => {
-              const pnl = safeNumber(t.pnl_usd_gross);
+              const kind = resultKind(t.result);
               const isSelected = selectedId === t.id;
               const isHovered = hoveredId === t.id;
               const bg = isSelected ? "#1d4ed8" : isHovered ? "#1f2937" : idx % 2 === 0 ? "#151515" : "#101010";
@@ -843,23 +941,23 @@ function TradeDetailTable({ trades }: { trades: TradeRow[] }) {
                   onMouseLeave={() => setHoveredId(null)}
                 >
                   <td style={tdBase}>{t.id}</td>
-                  <td style={tdBase}>{t.ticket || "—"}</td>
                   <td style={tdBase}>{t.symbol || "—"}</td>
                   <td style={tdBase}>{t.timeframe || "—"}</td>
                   <td style={tdBase}>{(t.side || "—").toUpperCase()}</td>
                   <td style={tdBase}>{t.ea || "—"}</td>
+                  <td style={tdBase}>{t.source_name || "—"}</td>
                   <td style={tdBase}>{t.session || "—"}</td>
-                  <td style={tdBase}>{t.patron || "—"}</td>
-                  <td style={tdBase}>{t.vela || "—"}</td>
-                  <td style={tdBase}>{t.emocion || "—"}</td>
-                  <td style={tdBase}>{fmtDateShort(t.dt_open_utc)}</td>
-                  <td style={tdBase}>{fmtDateShort(t.dt_close_utc)}</td>
+                  <td style={tdBase}>{t.pattern_name || "—"}</td>
+                  <td style={tdBase}>{t.candle_name || "—"}</td>
+                  <td style={tdBase}>{t.tendencia || "—"}</td>
+                  <td style={tdBase}>{fmtDateShort(dateOf(t))}</td>
+                  <td style={tdBase}>{fmtDateShort(t.target_date)}</td>
                   <td style={tdBase}>{t.rsi_value ?? "—"}</td>
                   <td style={tdBase}>{t.stochastic_k ?? "—"}</td>
                   <td style={tdBase}>{t.stochastic_d ?? "—"}</td>
-                  <td style={{ ...tdBase, color: isSelected ? "#fff" : pnl > 0 ? GREEN : pnl < 0 ? RED : "#ccc" }}>{fmtMoney(pnl)}</td>
+                  <td style={{ ...tdBase, color: isSelected ? "#fff" : resultColor(kind) }}>{t.result || "PENDING"}</td>
                   <td style={tdBase} onClick={(e) => e.stopPropagation()}>
-                    <a href={`/trades/${t.id}`} className="btn link" style={{ fontSize: 11, padding: "3px 6px" }}>
+                    <a href={`/fake-trades/${t.id}`} className="btn link" style={{ fontSize: 11, padding: "3px 6px" }}>
                       Ver
                     </a>
                   </td>
@@ -869,7 +967,7 @@ function TradeDetailTable({ trades }: { trades: TradeRow[] }) {
             {displayTrades.length === 0 && (
               <tr>
                 <td style={{ ...TD_STYLE_BASE, paddingTop: 10 }} colSpan={17}>
-                  Sin trades en este filtro.
+                  Sin fake trades en este filtro.
                 </td>
               </tr>
             )}
@@ -889,41 +987,51 @@ function MiniChartTooltipContent({ active, payload }: { active?: boolean; payloa
     <div style={{ backgroundColor: "#111", border: "1px solid #333", padding: "8px 10px", fontSize: 12 }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{row.key}</div>
       <div style={{ opacity: 0.85 }}>
-        {row.trades} tr. | {row.wins} W | {row.losses} L
+        {row.trades} tr. | {row.wins} W | {row.losses} L | {row.pending} pend.
       </div>
-      <div style={{ marginTop: 2, color: row.pnl > 0 ? GREEN : row.pnl < 0 ? RED : "#ccc" }}>P&amp;L {fmtMoney(row.pnl)}</div>
+      <div style={{ marginTop: 2, color: row.expectancy > 0 ? GREEN : row.expectancy < 0 ? RED : "#ccc" }}>
+        Win% {fmtPct(row.winRate)} · Expectancy {fmtScore(row.expectancy)}
+      </div>
     </div>
   );
 }
 
-export default function ChartsPage() {
+/* ===================== Página principal ===================== */
+
+export default function FakeTradeChartsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [trades, setTrades] = useState<TradeRow[]>([]);
+  const [trades, setTrades] = useState<FakeTradeRow[]>([]);
 
   const [filterDateFromDraft, setFilterDateFromDraft] = useState("");
   const [filterDateToDraft, setFilterDateToDraft] = useState("");
-  const [filterEaDraft, setFilterEaDraft] = useState("");
+  const [filterSourceTypeDraft, setFilterSourceTypeDraft] = useState("");
+  const [filterSourceNameDraft, setFilterSourceNameDraft] = useState("");
   const [filterSymbolDraft, setFilterSymbolDraft] = useState("");
   const [filterTfDraft, setFilterTfDraft] = useState("");
   const [filterSideDraft, setFilterSideDraft] = useState("");
   const [filterSessionDraft, setFilterSessionDraft] = useState("");
-  const [filterEmocionDraft, setFilterEmocionDraft] = useState("");
   const [filterPatronDraft, setFilterPatronDraft] = useState("");
   const [filterVelaDraft, setFilterVelaDraft] = useState("");
+  const [filterTendenciaDraft, setFilterTendenciaDraft] = useState("");
+  const [filterEaDraft, setFilterEaDraft] = useState("");
+  const [filterResultDraft, setFilterResultDraft] = useState("");
   const [filterDayDraft, setFilterDayDraft] = useState("");
   const [filterHourDraft, setFilterHourDraft] = useState("");
 
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [filterEa, setFilterEa] = useState("");
+  const [filterSourceType, setFilterSourceType] = useState("");
+  const [filterSourceName, setFilterSourceName] = useState("");
   const [filterSymbol, setFilterSymbol] = useState("");
   const [filterTf, setFilterTf] = useState("");
   const [filterSide, setFilterSide] = useState("");
   const [filterSession, setFilterSession] = useState("");
-  const [filterEmocion, setFilterEmocion] = useState("");
   const [filterPatron, setFilterPatron] = useState("");
   const [filterVela, setFilterVela] = useState("");
+  const [filterTendencia, setFilterTendencia] = useState("");
+  const [filterEa, setFilterEa] = useState("");
+  const [filterResult, setFilterResult] = useState("");
   const [filterDay, setFilterDay] = useState("");
   const [filterHour, setFilterHour] = useState("");
 
@@ -932,8 +1040,8 @@ export default function ChartsPage() {
   const [selectedPresetName, setSelectedPresetName] = useState("");
 
   const [minTrades, setMinTrades] = useState(3);
-  const [dynamicMetric, setDynamicMetric] = useState<MetricKey>("pnl");
-  const [dynamicDims, setDynamicDims] = useState<DimensionKey[]>(["ea", "symbol", "timeframe"]);
+  const [dynamicMetric, setDynamicMetric] = useState<MetricKey>("winRate");
+  const [dynamicDims, setDynamicDims] = useState<DimensionKey[]>(["sourceName", "symbol", "timeframe"]);
 
   const [rsiOversold, setRsiOversold] = useState(30);
   const [rsiOverbought, setRsiOverbought] = useState(70);
@@ -964,14 +1072,14 @@ export default function ChartsPage() {
           return;
         }
         const { data, error: qErr } = await supabase
-          .from("trades")
+          .from("fake_trades")
           .select("*")
           .eq("user_id", uid)
-          .order("dt_open_utc", { ascending: false, nullsFirst: false })
+          .order("setup_datetime", { ascending: false, nullsFirst: false })
           .order("id", { ascending: false })
-          .limit(2000);
+          .limit(5000);
         if (qErr) throw qErr;
-        if (!cancelled) setTrades((data || []) as unknown as TradeRow[]);
+        if (!cancelled) setTrades((data || []) as unknown as FakeTradeRow[]);
       } catch (err: any) {
         if (!cancelled) {
           setError(String(err?.message ?? err));
@@ -990,7 +1098,7 @@ export default function ChartsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem("bitlog_chart_presets");
+      const raw = window.localStorage.getItem("bitlog_faketrade_chart_presets");
       if (raw) {
         const parsed = JSON.parse(raw) as FilterPreset[];
         if (Array.isArray(parsed)) setPresets(parsed);
@@ -1001,70 +1109,35 @@ export default function ChartsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem("bitlog_chart_presets", JSON.stringify(presets));
+      window.localStorage.setItem("bitlog_faketrade_chart_presets", JSON.stringify(presets));
     } catch {}
   }, [presets]);
 
-  const allEAs = useMemo(() => {
+  const uniqueValues = (getter: (t: FakeTradeRow) => string | null | undefined) => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.ea?.trim()) s.add(t.ea.trim());
+      const v = getter(t);
+      if (v && v.trim()) s.add(v.trim());
     });
     return Array.from(s).sort();
-  }, [trades]);
+  };
 
-  const allSymbols = useMemo(() => {
-    const s = new Set<string>();
-    trades.forEach((t) => {
-      if (t.symbol?.trim()) s.add(t.symbol.trim());
-    });
-    return Array.from(s).sort();
-  }, [trades]);
-
-  const allTimeframes = useMemo(() => {
-    const s = new Set<string>();
-    trades.forEach((t) => {
-      if (t.timeframe?.trim()) s.add(t.timeframe.trim());
-    });
-    return Array.from(s).sort();
-  }, [trades]);
-
-  const allSessions = useMemo(() => {
-    const s = new Set<string>();
-    trades.forEach((t) => {
-      if (t.session?.trim()) s.add(t.session.trim());
-    });
-    return Array.from(s).sort();
-  }, [trades]);
-
-  const allEmociones = useMemo(() => {
-    const s = new Set<string>();
-    trades.forEach((t) => {
-      if (t.emocion?.trim()) s.add(t.emocion.trim());
-    });
-    return Array.from(s).sort();
-  }, [trades]);
-
-  const allPatrones = useMemo(() => {
-    const s = new Set<string>();
-    trades.forEach((t) => {
-      if (t.patron?.trim()) s.add(t.patron.trim());
-    });
-    return Array.from(s).sort();
-  }, [trades]);
-
-  const allVelas = useMemo(() => {
-    const s = new Set<string>();
-    trades.forEach((t) => {
-      if (t.vela?.trim()) s.add(t.vela.trim());
-    });
-    return Array.from(s).sort();
-  }, [trades]);
+  const allSourceTypes = useMemo(() => uniqueValues((t) => t.source_type), [trades]);
+  const allSourceNames = useMemo(() => uniqueValues((t) => t.source_name), [trades]);
+  const allSymbols = useMemo(() => uniqueValues((t) => t.symbol), [trades]);
+  const allTimeframes = useMemo(() => uniqueValues((t) => t.timeframe), [trades]);
+  const allSessions = useMemo(() => uniqueValues((t) => t.session), [trades]);
+  const allPatrones = useMemo(() => uniqueValues((t) => t.pattern_name), [trades]);
+  const allVelas = useMemo(() => uniqueValues((t) => t.candle_name), [trades]);
+  const allTendencias = useMemo(() => uniqueValues((t) => t.tendencia), [trades]);
+  const allEAs = useMemo(() => uniqueValues((t) => t.ea), [trades]);
+  const allResults = useMemo(() => uniqueValues((t) => t.result), [trades]);
 
   const allDays = useMemo(() => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.dt_open_utc) s.add(getDayMazatlan(t.dt_open_utc));
+      const d = dateOf(t);
+      if (d) s.add(getDayMazatlan(d));
     });
     return Array.from(s).sort((a, b) => {
       const ia = WEEKDAY_ORDER.indexOf(a.toLowerCase());
@@ -1077,7 +1150,8 @@ export default function ChartsPage() {
   const allHours = useMemo(() => {
     const s = new Set<string>();
     trades.forEach((t) => {
-      if (t.dt_open_utc) s.add(`${String(getHourMazatlan(t.dt_open_utc)).padStart(2, "0")}:00`);
+      const d = dateOf(t);
+      if (d) s.add(`${String(getHourMazatlan(d)).padStart(2, "0")}:00`);
     });
     return Array.from(s).sort();
   }, [trades]);
@@ -1086,38 +1160,48 @@ export default function ChartsPage() {
     let list = trades.slice();
     if (filterDateFrom) {
       const dFrom = new Date(filterDateFrom + "T00:00:00");
-      list = list.filter((t) => !!t.dt_open_utc && new Date(t.dt_open_utc) >= dFrom);
+      list = list.filter((t) => {
+        const d = dateOf(t);
+        return !!d && new Date(d) >= dFrom;
+      });
     }
     if (filterDateTo) {
       const dTo = new Date(filterDateTo + "T23:59:59");
-      list = list.filter((t) => !!t.dt_open_utc && new Date(t.dt_open_utc) <= dTo);
+      list = list.filter((t) => {
+        const d = dateOf(t);
+        return !!d && new Date(d) <= dTo;
+      });
     }
-    if (filterEa) list = list.filter((t) => (t.ea || "").toUpperCase() === filterEa.toUpperCase());
+    if (filterSourceType) list = list.filter((t) => (t.source_type || "").toUpperCase() === filterSourceType.toUpperCase());
+    if (filterSourceName) list = list.filter((t) => (t.source_name || "").toUpperCase() === filterSourceName.toUpperCase());
     if (filterSymbol) list = list.filter((t) => (t.symbol || "").toUpperCase() === filterSymbol.toUpperCase());
     if (filterTf) list = list.filter((t) => (t.timeframe || "").toUpperCase() === filterTf.toUpperCase());
     if (filterSide) list = list.filter((t) => (t.side || "").toUpperCase() === filterSide.toUpperCase());
     if (filterSession) list = list.filter((t) => (t.session || "").toUpperCase() === filterSession.toUpperCase());
-    if (filterEmocion) list = list.filter((t) => (t.emocion || "").toUpperCase() === filterEmocion.toUpperCase());
-    if (filterPatron) list = list.filter((t) => (t.patron || "").toUpperCase() === filterPatron.toUpperCase());
-    if (filterVela) list = list.filter((t) => (t.vela || "").toUpperCase() === filterVela.toUpperCase());
-    if (filterDay) list = list.filter((t) => (t.dt_open_utc ? getDayMazatlan(t.dt_open_utc) : "SIN_FECHA") === filterDay);
+    if (filterPatron) list = list.filter((t) => (t.pattern_name || "").toUpperCase() === filterPatron.toUpperCase());
+    if (filterVela) list = list.filter((t) => (t.candle_name || "").toUpperCase() === filterVela.toUpperCase());
+    if (filterTendencia) list = list.filter((t) => (t.tendencia || "").toUpperCase() === filterTendencia.toUpperCase());
+    if (filterEa) list = list.filter((t) => (t.ea || "").toUpperCase() === filterEa.toUpperCase());
+    if (filterResult) list = list.filter((t) => resultKind(t.result) === filterResult);
+    if (filterDay) list = list.filter((t) => (dateOf(t) ? getDayMazatlan(dateOf(t)!) : "SIN_FECHA") === filterDay);
     if (filterHour)
-      list = list.filter(
-        (t) => (t.dt_open_utc ? `${String(getHourMazatlan(t.dt_open_utc)).padStart(2, "0")}:00` : "SIN_HORA") === filterHour
-      );
+      list = list.filter((t) => (dateOf(t) ? `${String(getHourMazatlan(dateOf(t)!)).padStart(2, "0")}:00` : "SIN_HORA") === filterHour);
     return list;
   }, [
     trades,
     filterDateFrom,
     filterDateTo,
-    filterEa,
+    filterSourceType,
+    filterSourceName,
     filterSymbol,
     filterTf,
     filterSide,
     filterSession,
-    filterEmocion,
     filterPatron,
     filterVela,
+    filterTendencia,
+    filterEa,
+    filterResult,
     filterDay,
     filterHour,
   ]);
@@ -1126,98 +1210,110 @@ export default function ChartsPage() {
     const total = visibleTrades.length;
     let wins = 0;
     let losses = 0;
-    let pnl = 0;
+    let pending = 0;
+    let neutral = 0;
     visibleTrades.forEach((t) => {
-      const v = safeNumber(t.pnl_usd_gross);
-      pnl += v;
-      if (v > 0) wins++;
-      else if (v < 0) losses++;
+      const k = resultKind(t.result);
+      if (k === "WIN") wins++;
+      else if (k === "LOSS") losses++;
+      else if (k === "PENDING") pending++;
+      else neutral++;
     });
+    const closed = wins + losses;
     return {
       total,
       wins,
       losses,
-      winRate: total ? (wins / total) * 100 : 0,
-      pnl,
-      avgPnL: total ? pnl / total : 0,
+      pending,
+      neutral,
+      closed,
+      winRate: closed ? (wins / closed) * 100 : 0,
+      expectancy: closed ? ((wins - losses) / closed) * 100 : 0,
     };
   }, [visibleTrades]);
 
-  const avgDurationMs = useMemo(() => {
-    let totalMs = 0;
+  const avgDaysToTarget = useMemo(() => {
+    let total = 0;
     let count = 0;
     visibleTrades.forEach((t) => {
-      if (!t.dt_open_utc || !t.dt_close_utc) return;
-      const open = new Date(t.dt_open_utc).getTime();
-      const close = new Date(t.dt_close_utc).getTime();
-      if (!Number.isNaN(open) && !Number.isNaN(close) && close > open) {
-        totalMs += close - open;
+      const d = daysToTarget(t);
+      if (d !== null) {
+        total += d;
         count++;
       }
     });
-    return count ? totalMs / count : 0;
+    return count ? total / count : null;
   }, [visibleTrades]);
 
-  const perfByEA = useMemo(() => aggregateTrades(visibleTrades, ["ea"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const perfBySourceType = useMemo(() => aggregateTrades(visibleTrades, ["sourceType"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const perfBySourceName = useMemo(() => aggregateTrades(visibleTrades, ["sourceName"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfBySymbol = useMemo(() => aggregateTrades(visibleTrades, ["symbol"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfByTimeframe = useMemo(() => aggregateTrades(visibleTrades, ["timeframe"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfBySession = useMemo(() => aggregateTrades(visibleTrades, ["session"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfByDay = useMemo(() => aggregateTrades(visibleTrades, ["day"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfByHour = useMemo(() => aggregateTrades(visibleTrades, ["hour"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfByPatron = useMemo(() => aggregateTrades(visibleTrades, ["patron"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
-  const perfByEmocion = useMemo(() => aggregateTrades(visibleTrades, ["emocion"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const perfByVela = useMemo(() => aggregateTrades(visibleTrades, ["vela"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const perfByTendencia = useMemo(() => aggregateTrades(visibleTrades, ["tendencia"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const perfByEa = useMemo(() => aggregateTrades(visibleTrades, ["ea"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfBySide = useMemo(() => aggregateTrades(visibleTrades, ["side"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfByRsiZone = useMemo(() => aggregateTrades(visibleTrades, ["rsiZone"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfByStochKZone = useMemo(() => aggregateTrades(visibleTrades, ["stochKZone"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfByStochDZone = useMemo(() => aggregateTrades(visibleTrades, ["stochDZone"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
   const perfByOscillatorConfluence = useMemo(() => aggregateTrades(visibleTrades, ["oscillatorConfluence"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const perfByRvolZone = useMemo(() => aggregateTrades(visibleTrades, ["rvolZone"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const perfByAdxZone = useMemo(() => aggregateTrades(visibleTrades, ["adxZone"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const perfByEmaContext = useMemo(() => aggregateTrades(visibleTrades, ["emaContext"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
 
-  const confluenceBase = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
-  const confluencePatron = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "patron"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
-  const confluenceVela = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "vela"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
-  const confluenceEmocion = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "emocion"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
-  const confluenceSession = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "session"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
-  const confluenceSide = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "side"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
-  const confluenceRsi = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "rsiZone"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
-  const confluenceStochK = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "stochKZone"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
-  const confluenceOscillators = useMemo(() => aggregateTrades(visibleTrades, ["ea", "symbol", "timeframe", "oscillatorConfluence"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const confluenceBase = useMemo(() => aggregateTrades(visibleTrades, ["sourceName", "symbol", "timeframe"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const confluencePatron = useMemo(() => aggregateTrades(visibleTrades, ["sourceName", "symbol", "timeframe", "patron"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const confluenceVela = useMemo(() => aggregateTrades(visibleTrades, ["sourceName", "symbol", "timeframe", "vela"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const confluenceTendencia = useMemo(() => aggregateTrades(visibleTrades, ["sourceName", "symbol", "timeframe", "tendencia"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const confluenceSession = useMemo(() => aggregateTrades(visibleTrades, ["sourceName", "symbol", "timeframe", "session"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const confluenceSide = useMemo(() => aggregateTrades(visibleTrades, ["sourceName", "symbol", "timeframe", "side"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const confluenceRsi = useMemo(() => aggregateTrades(visibleTrades, ["sourceName", "symbol", "timeframe", "rsiZone"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const confluenceStochK = useMemo(() => aggregateTrades(visibleTrades, ["sourceName", "symbol", "timeframe", "stochKZone"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
+  const confluenceOscillators = useMemo(() => aggregateTrades(visibleTrades, ["sourceName", "symbol", "timeframe", "oscillatorConfluence"], oscillatorThresholds), [visibleTrades, oscillatorThresholds]);
 
   const dynamicConfluence = useMemo(() => aggregateTrades(visibleTrades, dynamicDims, oscillatorThresholds), [visibleTrades, oscillatorThresholds, dynamicDims]);
   const dynamicColumnLabels = useMemo(() => dynamicDims.map((d) => DIMENSION_LABELS[d]), [dynamicDims]);
 
-  const topBest = useMemo(() => dynamicConfluence.filter((r) => r.trades >= minTrades && r.pnl > 0).slice(0, 5), [dynamicConfluence, minTrades]);
+  const topBest = useMemo(() => dynamicConfluence.filter((r) => r.trades >= minTrades && r.wins + r.losses > 0 && r.expectancy > 0).slice(0, 5), [dynamicConfluence, minTrades]);
   const topWorst = useMemo(
     () =>
       dynamicConfluence
-        .filter((r) => r.trades >= minTrades && r.pnl < 0)
+        .filter((r) => r.trades >= minTrades && r.wins + r.losses > 0 && r.expectancy < 0)
         .slice()
-        .sort((a, b) => a.pnl - b.pnl)
+        .sort((a, b) => a.expectancy - b.expectancy)
         .slice(0, 5),
     [dynamicConfluence, minTrades]
   );
 
-  const equityCurve = useMemo(() => {
-    let acc = 0;
+  const accuracyCurve = useMemo(() => {
+    let wins = 0;
+    let closed = 0;
     return visibleTrades
       .slice()
-      .filter((t) => !!t.dt_open_utc)
-      .sort((a, b) => new Date(a.dt_open_utc || "").getTime() - new Date(b.dt_open_utc || "").getTime())
+      .filter((t) => !!dateOf(t) && resultKind(t.result) !== "PENDING")
+      .sort((a, b) => new Date(dateOf(a) || "").getTime() - new Date(dateOf(b) || "").getTime())
       .map((t, idx) => {
-        acc += safeNumber(t.pnl_usd_gross);
-        return { n: idx + 1, pnl: acc, label: fmtDateShort(t.dt_open_utc) };
+        closed += 1;
+        if (resultKind(t.result) === "WIN") wins += 1;
+        return { n: idx + 1, winRate: (wins / closed) * 100, label: fmtDateShort(dateOf(t)) };
       });
   }, [visibleTrades]);
 
-  const pieWinLossData = useMemo(
+  const pieResultData = useMemo(
     () => [
-      { name: "Wins", value: summary.wins },
-      { name: "Losses", value: summary.losses },
-      { name: "Neutros", value: Math.max(summary.total - summary.wins - summary.losses, 0) },
+      { name: "Ganadas", value: summary.wins },
+      { name: "Perdidas", value: summary.losses },
+      { name: "Pendientes", value: summary.pending },
+      { name: "Neutras", value: summary.neutral },
     ],
     [summary]
   );
 
-  const applyQuickPreset = (type: "today" | "7d" | "30d" | "ny") => {
+  const applyQuickPreset = (type: "today" | "7d" | "30d" | "pendientes") => {
     if (type === "today") {
       const today = getTodayMazatlan();
       setFilterDateFromDraft(today);
@@ -1239,23 +1335,25 @@ export default function ChartsPage() {
       setFilterDateFrom(from);
       setFilterDateTo(today);
     } else {
-      const ny = allSessions.find((s) => s.toUpperCase().includes("NY")) || allSessions.find((s) => s.toUpperCase().includes("NEW YORK")) || "";
-      setFilterSessionDraft(ny);
-      setFilterSession(ny);
+      setFilterResultDraft("PENDING");
+      setFilterResult("PENDING");
     }
   };
 
   const handleApplyGlobalFilters = () => {
     setFilterDateFrom(filterDateFromDraft);
     setFilterDateTo(filterDateToDraft);
-    setFilterEa(filterEaDraft);
+    setFilterSourceType(filterSourceTypeDraft);
+    setFilterSourceName(filterSourceNameDraft);
     setFilterSymbol(filterSymbolDraft);
     setFilterTf(filterTfDraft);
     setFilterSide(filterSideDraft);
     setFilterSession(filterSessionDraft);
-    setFilterEmocion(filterEmocionDraft);
     setFilterPatron(filterPatronDraft);
     setFilterVela(filterVelaDraft);
+    setFilterTendencia(filterTendenciaDraft);
+    setFilterEa(filterEaDraft);
+    setFilterResult(filterResultDraft);
     setFilterDay(filterDayDraft);
     setFilterHour(filterHourDraft);
   };
@@ -1263,26 +1361,32 @@ export default function ChartsPage() {
   const handleClearGlobalFilters = () => {
     setFilterDateFromDraft("");
     setFilterDateToDraft("");
-    setFilterEaDraft("");
+    setFilterSourceTypeDraft("");
+    setFilterSourceNameDraft("");
     setFilterSymbolDraft("");
     setFilterTfDraft("");
     setFilterSideDraft("");
     setFilterSessionDraft("");
-    setFilterEmocionDraft("");
     setFilterPatronDraft("");
     setFilterVelaDraft("");
+    setFilterTendenciaDraft("");
+    setFilterEaDraft("");
+    setFilterResultDraft("");
     setFilterDayDraft("");
     setFilterHourDraft("");
     setFilterDateFrom("");
     setFilterDateTo("");
-    setFilterEa("");
+    setFilterSourceType("");
+    setFilterSourceName("");
     setFilterSymbol("");
     setFilterTf("");
     setFilterSide("");
     setFilterSession("");
-    setFilterEmocion("");
     setFilterPatron("");
     setFilterVela("");
+    setFilterTendencia("");
+    setFilterEa("");
+    setFilterResult("");
     setFilterDay("");
     setFilterHour("");
   };
@@ -1294,14 +1398,17 @@ export default function ChartsPage() {
       name,
       dateFrom: filterDateFromDraft,
       dateTo: filterDateToDraft,
-      ea: filterEaDraft,
+      sourceType: filterSourceTypeDraft,
+      sourceName: filterSourceNameDraft,
       symbol: filterSymbolDraft,
       tf: filterTfDraft,
       side: filterSideDraft,
       session: filterSessionDraft,
-      emocion: filterEmocionDraft,
       patron: filterPatronDraft,
       vela: filterVelaDraft,
+      tendencia: filterTendenciaDraft,
+      ea: filterEaDraft,
+      result: filterResultDraft,
       day: filterDayDraft,
       hour: filterHourDraft,
     };
@@ -1314,26 +1421,32 @@ export default function ChartsPage() {
     if (!p) return;
     setFilterDateFromDraft(p.dateFrom);
     setFilterDateToDraft(p.dateTo);
-    setFilterEaDraft(p.ea);
+    setFilterSourceTypeDraft(p.sourceType || "");
+    setFilterSourceNameDraft(p.sourceName || "");
     setFilterSymbolDraft(p.symbol);
     setFilterTfDraft(p.tf);
     setFilterSideDraft(p.side);
     setFilterSessionDraft(p.session);
-    setFilterEmocionDraft(p.emocion || "");
     setFilterPatronDraft(p.patron || "");
     setFilterVelaDraft(p.vela || "");
+    setFilterTendenciaDraft(p.tendencia || "");
+    setFilterEaDraft(p.ea || "");
+    setFilterResultDraft(p.result || "");
     setFilterDayDraft(p.day || "");
     setFilterHourDraft(p.hour || "");
     setFilterDateFrom(p.dateFrom);
     setFilterDateTo(p.dateTo);
-    setFilterEa(p.ea);
+    setFilterSourceType(p.sourceType || "");
+    setFilterSourceName(p.sourceName || "");
     setFilterSymbol(p.symbol);
     setFilterTf(p.tf);
     setFilterSide(p.side);
     setFilterSession(p.session);
-    setFilterEmocion(p.emocion || "");
     setFilterPatron(p.patron || "");
     setFilterVela(p.vela || "");
+    setFilterTendencia(p.tendencia || "");
+    setFilterEa(p.ea || "");
+    setFilterResult(p.result || "");
     setFilterDay(p.day || "");
     setFilterHour(p.hour || "");
   };
@@ -1341,15 +1454,17 @@ export default function ChartsPage() {
   const handleExportCsv = () => {
     if (!visibleTrades.length) return;
     const headers = [
-      "id", "ticket", "symbol", "timeframe", "session", "dt_open_utc", "dt_close_utc", "side", "volume", "entry_price",
-      "exit_price", "pips", "rr_objetivo", "pnl_usd_gross", "pnl_usd_net", "fee_usd", "swap", "close_reason", "ea",
-      "ea_signal", "ea_score", "ea_tp1", "ea_tp2", "ea_tp3", "ea_sl1", "patron", "vela", "tendencia", "emocion", "stochastic_k", "stochastic_d", "rsi_value", "notes",
+      "id", "symbol", "side", "timeframe", "setup_datetime", "target_date", "source_type", "source_name", "source_url",
+      "pattern_name", "candle_name", "ea", "entry_price", "stop_loss", "take_profit", "tp1", "tp2", "resistance", "pivot",
+      "support", "tendencia", "session", "rsi_value", "stochastic_k", "stochastic_d", "ema20", "ema50", "ema100", "ema200",
+      "atr", "adx", "rvol", "expected_move", "failure_reason", "lessons_learned", "result", "notes",
     ];
     const rows = visibleTrades.map((t) =>
       [
-        t.id, t.ticket, t.symbol, t.timeframe, t.session, t.dt_open_utc, t.dt_close_utc, t.side, t.volume, t.entry_price,
-        t.exit_price, t.pips, t.rr_objetivo, t.pnl_usd_gross, t.pnl_usd_net, t.fee_usd, t.swap, t.close_reason, t.ea,
-        t.ea_signal, t.ea_score, t.ea_tp1, t.ea_tp2, t.ea_tp3, t.ea_sl1, t.patron, t.vela, t.tendencia, t.emocion, t.stochastic_k, t.stochastic_d, t.rsi_value, t.notes,
+        t.id, t.symbol, t.side, t.timeframe, t.setup_datetime, t.target_date, t.source_type, t.source_name, t.source_url,
+        t.pattern_name, t.candle_name, t.ea, t.entry_price, t.stop_loss, t.take_profit, t.tp1, t.tp2, t.resistance, t.pivot,
+        t.support, t.tendencia, t.session, t.rsi_value, t.stochastic_k, t.stochastic_d, t.ema20, t.ema50, t.ema100, t.ema200,
+        t.atr, t.adx, t.rvol, t.expected_move, t.failure_reason, t.lessons_learned, t.result, t.notes,
       ].map(csvEscape).join(",")
     );
     const csv = [headers.join(","), ...rows].join("\n");
@@ -1357,7 +1472,7 @@ export default function ChartsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "bitlog_charts_filtrado.csv";
+    a.download = "bitlog_fake_trades_filtrado.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1371,15 +1486,13 @@ export default function ChartsPage() {
     });
   };
 
-  const chartMetricLabel = dynamicMetric === "pnl" ? "PnL" : dynamicMetric === "winRate" ? "Win%" : "Trades";
-  const chartMetricFormatter = (value: any) =>
-    dynamicMetric === "pnl" ? fmtMoney(Number(value)) : dynamicMetric === "winRate" ? fmtPct(Number(value)) : Number(value);
+  const chartMetricLabel = dynamicMetric === "winRate" ? "Win%" : dynamicMetric === "expectancy" ? "Expectancy" : "Trades";
   const chartRows = dynamicConfluence.filter((r) => r.trades >= minTrades).slice(0, 12).map((r) => ({ ...r, metric: r[dynamicMetric] }));
   const dynamicChartHeight = Math.max(320, chartRows.length * 42);
 
   const renderButtonStyle: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 10px", fontSize: 12, borderRadius: 0, minWidth: 0, width: "auto" };
 
-  const renderMiniChart = (title: string, rows: PerfRow[], metric: MetricKey = "pnl") => {
+  const renderMiniChart = (title: string, rows: PerfRow[], metric: MetricKey = "winRate") => {
     const data = rows.filter((r) => r.trades >= minTrades).slice(0, 8).map((r) => ({ ...r, metric: r[metric] }));
     return (
       <div style={CARD_STYLE}>
@@ -1394,7 +1507,7 @@ export default function ChartsPage() {
                 <XAxis dataKey="key" stroke={AXIS} tick={{ fontSize: 11 }} interval={0} />
                 <YAxis stroke={AXIS} />
                 <Tooltip content={<MiniChartTooltipContent />} />
-                <Bar dataKey="metric" name={metric === "pnl" ? "PnL" : metric === "winRate" ? "Win%" : "Trades"} radius={[6, 6, 0, 0]}>
+                <Bar dataKey="metric" name={metric === "winRate" ? "Win%" : metric === "expectancy" ? "Expectancy" : "Trades"} radius={[6, 6, 0, 0]}>
                   {data.map((entry) => (
                     <Cell key={entry.key} fill={Number(entry.metric) >= 0 ? GREEN : RED} />
                   ))}
@@ -1413,10 +1526,10 @@ export default function ChartsPage() {
 
       <div style={CARD_STYLE}>
         <h1 className="title" style={{ marginTop: 0, marginBottom: 8 }}>
-          Charts — Dashboard &amp; Confluencias
+          Charts Fake Trades — Dashboard &amp; Confluencias
         </h1>
         <p style={{ margin: 0, opacity: 0.8, fontSize: 13, marginBottom: 8 }}>
-          Gráficas modernas rojo/verde, diagnóstico por categoría, confluencias fijas y generador dinámico on demand.
+          Laboratorio estadístico de predicciones externas (fake trades). No toca tus trades reales.
         </p>
         <div style={{ fontSize: 13, marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <button type="button" className="btn" onClick={handleApplyGlobalFilters} style={renderButtonStyle}>Aplicar filtros</button>
@@ -1425,11 +1538,12 @@ export default function ChartsPage() {
           <button type="button" className="btn" onClick={() => applyQuickPreset("today")} style={renderButtonStyle}>Hoy</button>
           <button type="button" className="btn" onClick={() => applyQuickPreset("7d")} style={renderButtonStyle}>Últimos 7 días</button>
           <button type="button" className="btn" onClick={() => applyQuickPreset("30d")} style={renderButtonStyle}>Últimos 30 días</button>
-          <button type="button" className="btn" onClick={() => applyQuickPreset("ny")} style={renderButtonStyle}>Solo NY Session</button>
+          <button type="button" className="btn" onClick={() => applyQuickPreset("pendientes")} style={renderButtonStyle}>Solo pendientes</button>
+          <a className="btn secondary" href="/fake-trades" style={renderButtonStyle}>Volver a Fake Trades</a>
         </div>
         <div style={{ marginTop: 12 }}>
           <span style={{ ...BADGE_STYLE_BASE, backgroundColor: summary.winRate >= 60 ? "#166534" : summary.winRate >= 50 ? "#374151" : "#991b1b", color: "#fff" }}>
-            Winrate global: {fmtPct(summary.winRate)}
+            Win rate global: {fmtPct(summary.winRate)}
           </span>
         </div>
       </div>
@@ -1445,17 +1559,20 @@ export default function ChartsPage() {
             <div className="label">Hasta</div>
             <input className="input" type="date" value={filterDateToDraft} onChange={(e) => setFilterDateToDraft(e.target.value)} />
           </div>
-          <FilterDropdown label="EA" value={filterEaDraft} options={allEAs} onChange={setFilterEaDraft} />
+          <FilterDropdown label="Tipo de fuente" value={filterSourceTypeDraft} options={allSourceTypes} onChange={setFilterSourceTypeDraft} />
+          <FilterDropdown label="Fuente" value={filterSourceNameDraft} options={allSourceNames} onChange={setFilterSourceNameDraft} />
           <FilterDropdown label="Símbolo" value={filterSymbolDraft} options={allSymbols} onChange={setFilterSymbolDraft} />
           <FilterDropdown label="Timeframe" value={filterTfDraft} options={allTimeframes} onChange={setFilterTfDraft} />
           <FilterDropdown label="Dirección" value={filterSideDraft} options={["BUY", "SELL"]} onChange={setFilterSideDraft} placeholder="(Todas)" />
           <FilterDropdown label="Sesión" value={filterSessionDraft} options={allSessions} onChange={setFilterSessionDraft} placeholder="(Todas)" />
-          <FilterDropdown label="Emoción" value={filterEmocionDraft} options={allEmociones} onChange={setFilterEmocionDraft} placeholder="(Todas)" />
           <FilterDropdown label="Patrón" value={filterPatronDraft} options={allPatrones} onChange={setFilterPatronDraft} placeholder="(Todos)" />
           <FilterDropdown label="Vela" value={filterVelaDraft} options={allVelas} onChange={setFilterVelaDraft} placeholder="(Todas)" />
+          <FilterDropdown label="Tendencia" value={filterTendenciaDraft} options={allTendencias} onChange={setFilterTendenciaDraft} placeholder="(Todas)" />
+          <FilterDropdown label="EA" value={filterEaDraft} options={allEAs} onChange={setFilterEaDraft} placeholder="(Todos)" />
+          <FilterDropdown label="Resultado" value={filterResultDraft} options={allResults} onChange={setFilterResultDraft} placeholder="(Todos)" />
           <FilterDropdown label="Día" value={filterDayDraft} options={allDays} onChange={setFilterDayDraft} placeholder="(Todos)" />
           <FilterDropdown label="Hora" value={filterHourDraft} options={allHours} onChange={setFilterHourDraft} placeholder="(Todas)" />
-          
+
           <div className="field">
             <div className="label">Mínimo de trades</div>
             <select className="input" value={minTrades} onChange={(e) => setMinTrades(Number(e.target.value))}>
@@ -1469,7 +1586,6 @@ export default function ChartsPage() {
               <option value={100}>100</option>
               <option value={300}>300</option>
               <option value={500}>500</option>
-              <option value={1000}>1000</option>
             </select>
           </div>
 
@@ -1504,7 +1620,7 @@ export default function ChartsPage() {
           <div className="field">
             <div className="label">Nombre de preset</div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input className="input" type="text" value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Setup XAU M15" />
+              <input className="input" type="text" value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Ej. Señales Telegram XAU" />
               <button type="button" className="btn" onClick={handleSavePreset} style={renderButtonStyle}>Guardar preset</button>
             </div>
           </div>
@@ -1522,35 +1638,8 @@ export default function ChartsPage() {
             </div>
           </div>
         </div>
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-        
-        
-        
-        
-        
-        
-        
-        
-        
-      </div>   
+      </div>
+
       <div style={CARD_STYLE}>
         <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>Resumen global</h2>
         {loading ? (
@@ -1560,13 +1649,13 @@ export default function ChartsPage() {
         ) : (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginBottom: 12 }}>
-              <div><div className="label">Trades</div><div style={{ fontSize: 18, fontWeight: 700 }}>{summary.total}</div></div>
-              <div><div className="label">Wins</div><div style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{summary.wins}</div></div>
-              <div><div className="label">Losses</div><div style={{ fontSize: 18, fontWeight: 700, color: RED }}>{summary.losses}</div></div>
+              <div><div className="label">Predicciones</div><div style={{ fontSize: 18, fontWeight: 700 }}>{summary.total}</div></div>
+              <div><div className="label">Ganadas</div><div style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{summary.wins}</div></div>
+              <div><div className="label">Perdidas</div><div style={{ fontSize: 18, fontWeight: 700, color: RED }}>{summary.losses}</div></div>
+              <div><div className="label">Pendientes</div><div style={{ fontSize: 18, fontWeight: 700, color: AMBER }}>{summary.pending}</div></div>
               <div><div className="label">Win rate</div><div style={{ fontSize: 18, fontWeight: 700 }}>{fmtPct(summary.winRate)}</div></div>
-              <div><div className="label">PnL total</div><div style={{ fontSize: 18, fontWeight: 700, color: summary.pnl > 0 ? GREEN : summary.pnl < 0 ? RED : "#ccc" }}>{fmtMoney(summary.pnl)}</div></div>
-              <div><div className="label">PnL promedio</div><div style={{ fontSize: 18, fontWeight: 700 }}>{fmtMoney(summary.avgPnL)}</div></div>
-              <div><div className="label">Duración promedio</div><div style={{ fontSize: 18, fontWeight: 700 }}>{formatDurationHMS(avgDurationMs)}</div></div>
+              <div><div className="label">Expectancy</div><div style={{ fontSize: 18, fontWeight: 700, color: summary.expectancy > 0 ? GREEN : summary.expectancy < 0 ? RED : "#ccc" }}>{fmtScore(summary.expectancy)}</div></div>
+              <div><div className="label">Horizonte promedio a target</div><div style={{ fontSize: 18, fontWeight: 700 }}>{fmtDays(avgDaysToTarget)}</div></div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16 }}>
               <PerfTable title="Top mejor comportamiento" rows={topBest} columns={dynamicColumnLabels} minTrades={minTrades} idPrefix="top_mejor" />
@@ -1578,25 +1667,25 @@ export default function ChartsPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 2fr) minmax(260px, 1fr)", gap: 16, marginBottom: 16 }}>
         <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Equity curve — PnL acumulado</h2>
-          {equityCurve.length === 0 ? (
+          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Precisión acumulada — Win rate</h2>
+          {accuracyCurve.length === 0 ? (
             <p style={{ fontSize: 12, opacity: 0.8 }}>Sin datos.</p>
           ) : (
             <div style={{ width: "100%", height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={equityCurve}>
+                <LineChart data={accuracyCurve}>
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                   <XAxis dataKey="n" stroke={AXIS} tick={{ fontSize: 11 }} />
-                  <YAxis stroke={AXIS} />
-                  <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #333" }} formatter={(value: any) => fmtMoney(Number(value))} labelFormatter={(label) => `Trade #${label}`} />
-                  <Line type="monotone" dataKey="pnl" name="PnL acumulado" stroke={summary.pnl >= 0 ? GREEN : RED} strokeWidth={2.5} dot={false} />
+                  <YAxis stroke={AXIS} domain={[0, 100]} />
+                  <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #333" }} formatter={(value: any) => fmtPct(Number(value))} labelFormatter={(label) => `Predicción #${label}`} />
+                  <Line type="monotone" dataKey="winRate" name="Win rate acumulado" stroke={summary.winRate >= 50 ? GREEN : RED} strokeWidth={2.5} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           )}
         </div>
         <div style={CARD_STYLE}>
-          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Wins vs Losses</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Distribución de resultados</h2>
           {summary.total === 0 ? (
             <p style={{ fontSize: 12, opacity: 0.8 }}>Sin datos.</p>
           ) : (
@@ -1605,8 +1694,8 @@ export default function ChartsPage() {
                 <PieChart>
                   <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #333" }} />
                   <Legend />
-                  <Pie data={pieWinLossData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} label>
-                    {[GREEN, RED, NEUTRAL].map((c) => (
+                  <Pie data={pieResultData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={82} label>
+                    {[GREEN, RED, AMBER, NEUTRAL].map((c) => (
                       <Cell key={c} fill={c} />
                     ))}
                   </Pie>
@@ -1617,54 +1706,66 @@ export default function ChartsPage() {
         </div>
       </div>
 
-      <h2 style={{ fontSize: 18, margin: "4px 0 12px" }}>Dónde gano / dónde pierdo</h2>
+      <h2 style={{ fontSize: 18, margin: "4px 0 12px" }}>Dónde acierto / dónde fallo</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 16, marginBottom: 16 }}>
-        {renderMiniChart("PnL por EA", perfByEA)}
-        {renderMiniChart("PnL por símbolo", perfBySymbol)}
-        {renderMiniChart("PnL por timeframe", perfByTimeframe)}
-        {renderMiniChart("PnL por sesión", perfBySession)}
-        {renderMiniChart("PnL por día", perfByDay)}
-        {renderMiniChart("PnL por hora", perfByHour)}
-        {renderMiniChart("PnL por patrón", perfByPatron)}
-        {renderMiniChart("PnL por emoción", perfByEmocion)}
-        {renderMiniChart("PnL por dirección BUY/SELL", perfBySide)}
-        {renderMiniChart("PnL por zona RSI", perfByRsiZone, "winRate")}
-        {renderMiniChart("PnL por zona Estocástico K%", perfByStochKZone, "winRate")}
-        {renderMiniChart("PnL por confluencia RSI/Stoch", perfByOscillatorConfluence, "winRate")}
+        {renderMiniChart("Win% por tipo de fuente", perfBySourceType)}
+        {renderMiniChart("Win% por fuente", perfBySourceName)}
+        {renderMiniChart("Win% por símbolo", perfBySymbol)}
+        {renderMiniChart("Win% por timeframe", perfByTimeframe)}
+        {renderMiniChart("Win% por sesión", perfBySession)}
+        {renderMiniChart("Win% por día", perfByDay)}
+        {renderMiniChart("Win% por hora", perfByHour)}
+        {renderMiniChart("Win% por patrón", perfByPatron)}
+        {renderMiniChart("Win% por vela", perfByVela)}
+        {renderMiniChart("Win% por tendencia", perfByTendencia)}
+        {renderMiniChart("Win% por EA", perfByEa)}
+        {renderMiniChart("Win% por dirección BUY/SELL", perfBySide)}
+        {renderMiniChart("Win% por zona RSI", perfByRsiZone)}
+        {renderMiniChart("Win% por zona Estocástico K%", perfByStochKZone)}
+        {renderMiniChart("Win% por confluencia RSI/Stoch", perfByOscillatorConfluence)}
+        {renderMiniChart("Win% por zona RVOL", perfByRvolZone)}
+        {renderMiniChart("Win% por zona ADX", perfByAdxZone)}
+        {renderMiniChart("Win% por contexto de EMAs", perfByEmaContext)}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 16, marginBottom: 16 }}>
-        <PerfTable title="Performance por EA" rows={perfByEA} columns={["EA"]} minTrades={minTrades} idPrefix="perf_ea" />
+        <PerfTable title="Performance por tipo de fuente" rows={perfBySourceType} columns={["Tipo de fuente"]} minTrades={minTrades} idPrefix="perf_source_type" />
+        <PerfTable title="Performance por fuente" rows={perfBySourceName} columns={["Fuente"]} minTrades={minTrades} idPrefix="perf_source_name" />
         <PerfTable title="Performance por símbolo" rows={perfBySymbol} columns={["Símbolo"]} minTrades={minTrades} idPrefix="perf_symbol" />
         <PerfTable title="Performance por timeframe" rows={perfByTimeframe} columns={["TF"]} minTrades={minTrades} idPrefix="perf_tf" />
         <PerfTable title="Performance por sesión" rows={perfBySession} columns={["Sesión"]} minTrades={minTrades} idPrefix="perf_session" />
         <PerfTable title="Performance por día" rows={perfByDay} columns={["Día"]} minTrades={minTrades} idPrefix="perf_day" />
         <PerfTable title="Performance por hora" rows={perfByHour} columns={["Hora"]} minTrades={minTrades} idPrefix="perf_hour" />
         <PerfTable title="Performance por patrón" rows={perfByPatron} columns={["Patrón"]} minTrades={minTrades} idPrefix="perf_patron" />
-        <PerfTable title="Performance por emoción" rows={perfByEmocion} columns={["Emoción"]} minTrades={minTrades} idPrefix="perf_emocion" />
+        <PerfTable title="Performance por vela" rows={perfByVela} columns={["Vela"]} minTrades={minTrades} idPrefix="perf_vela" />
+        <PerfTable title="Performance por tendencia" rows={perfByTendencia} columns={["Tendencia"]} minTrades={minTrades} idPrefix="perf_tendencia" />
+        <PerfTable title="Performance por EA" rows={perfByEa} columns={["EA"]} minTrades={minTrades} idPrefix="perf_ea" />
         <PerfTable title="Performance por dirección" rows={perfBySide} columns={["Dirección"]} minTrades={minTrades} idPrefix="perf_side" />
         <PerfTable title="Performance por zona RSI" rows={perfByRsiZone} columns={["Zona RSI"]} minTrades={minTrades} idPrefix="perf_rsi_zone" />
         <PerfTable title="Performance por zona Estocástico K%" rows={perfByStochKZone} columns={["Zona Stoch K%"]} minTrades={minTrades} idPrefix="perf_stoch_k_zone" />
         <PerfTable title="Performance por zona Estocástico D%" rows={perfByStochDZone} columns={["Zona Stoch D%"]} minTrades={minTrades} idPrefix="perf_stoch_d_zone" />
         <PerfTable title="Performance por confluencia RSI/Stoch" rows={perfByOscillatorConfluence} columns={["Confluencia"]} minTrades={minTrades} idPrefix="perf_oscillator_confluence" />
+        <PerfTable title="Performance por zona RVOL" rows={perfByRvolZone} columns={["Zona RVOL"]} minTrades={minTrades} idPrefix="perf_rvol_zone" />
+        <PerfTable title="Performance por zona ADX" rows={perfByAdxZone} columns={["Zona ADX"]} minTrades={minTrades} idPrefix="perf_adx_zone" />
+        <PerfTable title="Performance por contexto de EMAs" rows={perfByEmaContext} columns={["Contexto EMAs"]} minTrades={minTrades} idPrefix="perf_ema_context" />
       </div>
 
       <h2 style={{ fontSize: 18, margin: "4px 0 12px" }}>Confluencias fijas</h2>
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginBottom: 16 }}>
-        <PerfTable title="EA + símbolo + TF" rows={confluenceBase} columns={["EA", "Símbolo", "TF"]} minTrades={minTrades} idPrefix="confluencia_base" />
-        <PerfTable title="EA + símbolo + TF + patrón" rows={confluencePatron} columns={["EA", "Símbolo", "TF", "Patrón"]} minTrades={minTrades} idPrefix="confluencia_patron" />
-        <PerfTable title="EA + símbolo + TF + vela" rows={confluenceVela} columns={["EA", "Símbolo", "TF", "Vela"]} minTrades={minTrades} idPrefix="confluencia_vela" />
-        <PerfTable title="EA + símbolo + TF + emoción" rows={confluenceEmocion} columns={["EA", "Símbolo", "TF", "Emoción"]} minTrades={minTrades} idPrefix="confluencia_emocion" />
-        <PerfTable title="EA + símbolo + TF + sesión" rows={confluenceSession} columns={["EA", "Símbolo", "TF", "Sesión"]} minTrades={minTrades} idPrefix="confluencia_sesion" />
-        <PerfTable title="EA + símbolo + TF + dirección BUY/SELL" rows={confluenceSide} columns={["EA", "Símbolo", "TF", "Dirección"]} minTrades={minTrades} idPrefix="confluencia_side" />
-        <PerfTable title="EA + símbolo + TF + zona RSI" rows={confluenceRsi} columns={["EA", "Símbolo", "TF", "Zona RSI"]} minTrades={minTrades} idPrefix="confluencia_rsi" />
-        <PerfTable title="EA + símbolo + TF + zona Stoch K%" rows={confluenceStochK} columns={["EA", "Símbolo", "TF", "Zona Stoch K%"]} minTrades={minTrades} idPrefix="confluencia_stoch_k" />
-        <PerfTable title="EA + símbolo + TF + confluencia RSI/Stoch" rows={confluenceOscillators} columns={["EA", "Símbolo", "TF", "Confluencia"]} minTrades={minTrades} idPrefix="confluencia_oscillators" />
+        <PerfTable title="Fuente + símbolo + TF" rows={confluenceBase} columns={["Fuente", "Símbolo", "TF"]} minTrades={minTrades} idPrefix="confluencia_base" />
+        <PerfTable title="Fuente + símbolo + TF + patrón" rows={confluencePatron} columns={["Fuente", "Símbolo", "TF", "Patrón"]} minTrades={minTrades} idPrefix="confluencia_patron" />
+        <PerfTable title="Fuente + símbolo + TF + vela" rows={confluenceVela} columns={["Fuente", "Símbolo", "TF", "Vela"]} minTrades={minTrades} idPrefix="confluencia_vela" />
+        <PerfTable title="Fuente + símbolo + TF + tendencia" rows={confluenceTendencia} columns={["Fuente", "Símbolo", "TF", "Tendencia"]} minTrades={minTrades} idPrefix="confluencia_tendencia" />
+        <PerfTable title="Fuente + símbolo + TF + sesión" rows={confluenceSession} columns={["Fuente", "Símbolo", "TF", "Sesión"]} minTrades={minTrades} idPrefix="confluencia_sesion" />
+        <PerfTable title="Fuente + símbolo + TF + dirección BUY/SELL" rows={confluenceSide} columns={["Fuente", "Símbolo", "TF", "Dirección"]} minTrades={minTrades} idPrefix="confluencia_side" />
+        <PerfTable title="Fuente + símbolo + TF + zona RSI" rows={confluenceRsi} columns={["Fuente", "Símbolo", "TF", "Zona RSI"]} minTrades={minTrades} idPrefix="confluencia_rsi" />
+        <PerfTable title="Fuente + símbolo + TF + zona Stoch K%" rows={confluenceStochK} columns={["Fuente", "Símbolo", "TF", "Zona Stoch K%"]} minTrades={minTrades} idPrefix="confluencia_stoch_k" />
+        <PerfTable title="Fuente + símbolo + TF + confluencia RSI/Stoch" rows={confluenceOscillators} columns={["Fuente", "Símbolo", "TF", "Confluencia"]} minTrades={minTrades} idPrefix="confluencia_oscillators" />
       </div>
 
       <div style={CARD_STYLE}>
         <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 15 }}>Generador dinámico de confluencias</h2>
-        <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>Escoge las piezas de la confluencia y Bitlog genera el ranking y la gráfica al momento. Sin redundancia, sin circo.</p>
+        <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>Escoge las piezas de la confluencia y Bitlog genera el ranking y la gráfica al momento.</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           {DIMENSION_OPTIONS.map(([dim, label]) => (
             <button key={dim} type="button" className="btn" onClick={() => toggleDynamicDim(dim)} style={{ ...renderButtonStyle, backgroundColor: dynamicDims.includes(dim) ? "#1f2937" : undefined }}>
@@ -1676,8 +1777,8 @@ export default function ChartsPage() {
           <div className="field">
             <div className="label">Métrica de gráfica</div>
             <select className="input" value={dynamicMetric} onChange={(e) => setDynamicMetric(e.target.value as MetricKey)}>
-              <option value="pnl">PnL</option>
               <option value="winRate">Win%</option>
+              <option value="expectancy">Expectancy</option>
               <option value="trades">Trades</option>
             </select>
           </div>
