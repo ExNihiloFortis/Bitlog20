@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 type SourceFilter = "REAL_TRADE" | "FAKE_TRADE" | "STUDY_CASE";
 type HistoricalSource = "REAL_TRADE" | "FAKE_TRADE";
+type PatternOutcome = "PENDING" | "MATCHED" | "FAILED";
 
 type GalleryImage = {
   key: string;
@@ -29,6 +30,7 @@ type GalleryGroup = {
   ticket?: string | null;
   symbol?: string | null;
   pattern: string | null;
+  patternOutcome: PatternOutcome;
   notes?: string | null;
   sourceOriginType?: string | null;
   sourceOriginId?: number | null;
@@ -75,6 +77,7 @@ export default function GalleryPage() {
   const [working, setWorking] = useState(false);
   const [patterns, setPatterns] = useState<string[]>([]);
   const [patternFilter, setPatternFilter] = useState("ALL");
+  const [outcomeFilter, setOutcomeFilter] = useState<"ALL" | PatternOutcome>("ALL");
   const [sources, setSources] = useState<Record<SourceFilter, boolean>>({
     REAL_TRADE: true,
     FAKE_TRADE: false,
@@ -155,6 +158,17 @@ export default function GalleryPage() {
         });
       }
 
+      const { data: groupMetaRows, error: groupMetaError } = await supabase
+        .from("gallery_group_metadata")
+        .select("source_type,source_id,pattern_outcome")
+        .eq("user_id", userId);
+      if (groupMetaError) throw groupMetaError;
+
+      const groupMeta = new Map<string, PatternOutcome>();
+      for (const m of groupMetaRows || []) {
+        groupMeta.set(`${m.source_type}:${m.source_id}`, (m.pattern_outcome ?? "PENDING") as PatternOutcome);
+      }
+
       // ---------------- REAL TRADES ----------------
       if (sources.REAL_TRADE) {
         let q = supabase
@@ -213,6 +227,7 @@ export default function GalleryPage() {
                 ticket: t.ticket ?? null,
                 symbol: t.symbol ?? null,
                 pattern: t.patron ?? null,
+                patternOutcome: groupMeta.get(`REAL_TRADE:${t.id}`) ?? "PENDING",
                 images: sortImages(resolved),
               });
             }
@@ -277,6 +292,7 @@ export default function GalleryPage() {
                 id: Number(t.id),
                 symbol: t.symbol ?? null,
                 pattern: t.pattern_name ?? null,
+                patternOutcome: groupMeta.get(`FAKE_TRADE:${t.id}`) ?? "PENDING",
                 images: sortImages(resolved),
               });
             }
@@ -390,6 +406,7 @@ export default function GalleryPage() {
                 type: "STUDY_CASE",
                 id: Number(c.id),
                 pattern: c.pattern_name ?? null,
+                patternOutcome: groupMeta.get(`STUDY_CASE:${c.id}`) ?? "PENDING",
                 notes: c.notes ?? null,
                 sourceOriginType: c.source_origin_type ?? null,
                 sourceOriginId: c.source_origin_id ? Number(c.source_origin_id) : null,
@@ -400,7 +417,7 @@ export default function GalleryPage() {
         }
       }
 
-      setGroups(nextGroups);
+      setGroups(outcomeFilter === "ALL" ? nextGroups : nextGroups.filter((g) => g.patternOutcome === outcomeFilter));
     } catch (e: any) {
       console.error(e);
       alert("Error cargando Gallery: " + (e?.message ?? String(e)));
@@ -408,11 +425,30 @@ export default function GalleryPage() {
     } finally {
       setLoading(false);
     }
-  }, [userId, enabledSources.length, patternFilter, sources.REAL_TRADE, sources.FAKE_TRADE, sources.STUDY_CASE]);
+  }, [userId, enabledSources.length, patternFilter, outcomeFilter, sources.REAL_TRADE, sources.FAKE_TRADE, sources.STUDY_CASE]);
 
   useEffect(() => {
     if (userId) loadGallery();
   }, [userId, loadGallery]);
+
+  async function savePatternOutcome(group: GalleryGroup, patternOutcome: PatternOutcome) {
+    try {
+      const { error } = await supabase.from("gallery_group_metadata").upsert(
+        {
+          user_id: userId,
+          source_type: group.type,
+          source_id: group.id,
+          pattern_outcome: patternOutcome,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,source_type,source_id" }
+      );
+      if (error) throw error;
+      setGroups((current) => current.map((g) => g.key === group.key ? { ...g, patternOutcome } : g));
+    } catch (e: any) {
+      alert("No se pudo guardar el resultado del patrón: " + (e?.message ?? String(e)));
+    }
+  }
 
   async function saveImageTimeframe(image: GalleryImage, timeframe: string) {
     const tf = timeframe || null;
@@ -920,6 +956,16 @@ export default function GalleryPage() {
                 {patterns.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
+
+            <div className="field">
+              <label className="label">Resultado del patrón</label>
+              <select className="select" value={outcomeFilter} onChange={(e) => setOutcomeFilter(e.target.value as "ALL" | PatternOutcome)}>
+                <option value="ALL">Todos los resultados</option>
+                <option value="MATCHED">Cumplido</option>
+                <option value="FAILED">No cumplido</option>
+                <option value="PENDING">Sin evaluar</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -951,6 +997,18 @@ export default function GalleryPage() {
                   <div className="hint">
                     {group.images.length} foto{group.images.length === 1 ? "" : "s"}
                     {group.pattern ? ` · Patrón: ${group.pattern}` : ""}
+                  </div>
+                  <div className="gallery-outcome-row">
+                    <span className="hint">Resultado del patrón:</span>
+                    <select
+                      className={`select gallery-outcome-select outcome-${group.patternOutcome.toLowerCase()}`}
+                      value={group.patternOutcome}
+                      onChange={(e) => savePatternOutcome(group, e.target.value as PatternOutcome)}
+                    >
+                      <option value="PENDING">⚪ Sin evaluar</option>
+                      <option value="MATCHED">🟢 Cumplido</option>
+                      <option value="FAILED">🔴 No cumplido</option>
+                    </select>
                   </div>
                   {group.type === "STUDY_CASE" && group.sourceOriginType && group.sourceOriginType !== "MANUAL" && (
                     <div className="hint" style={{ marginTop: 4 }}>
@@ -1317,7 +1375,7 @@ export default function GalleryPage() {
         .gallery-head, .gallery-group-head, .gallery-study-modal-head, .gallery-study-modal-foot, .gallery-viewer-head {
           display:flex; align-items:center; justify-content:space-between; gap:14px;
         }
-        .gallery-filters { display:grid; grid-template-columns: 2fr 1fr; gap:16px; margin-top:18px; }
+        .gallery-filters { display:grid; grid-template-columns: 2fr 1fr 1fr; gap:16px; margin-top:18px; }
         .gallery-source-row { display:flex; flex-wrap:wrap; gap:8px; }
         .gallery-source-chip { display:flex; gap:7px; align-items:center; padding:9px 12px; border:1px solid #233041; background:#0d1117; cursor:pointer; }
         .gallery-source-chip.active { border-color:#1f6feb; background:#111d31; }
@@ -1356,6 +1414,11 @@ export default function GalleryPage() {
         .gallery-viewer-body img { object-fit:contain; display:block; cursor:zoom-in; user-select:none; }
         .gallery-viewer-foot { flex:0 0 auto; padding:10px; text-align:center; border-top:1px solid #1e2630; }
         @media (max-width:1100px) { .gallery-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+
+        .gallery-outcome-row { display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
+        .gallery-outcome-select { width:auto; min-width:160px; padding:6px 9px; font-weight:700; }
+        .gallery-outcome-select.outcome-matched { border-color:#16a34a; }
+        .gallery-outcome-select.outcome-failed { border-color:#dc2626; }
         @media (max-width:850px) { .gallery-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .gallery-filters { grid-template-columns:1fr; } .gallery-group-head { align-items:flex-start; flex-direction:column; } }
         @media (max-width:600px) { .gallery-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .gallery-head { align-items:flex-start; flex-direction:column; } }
       `}</style>
